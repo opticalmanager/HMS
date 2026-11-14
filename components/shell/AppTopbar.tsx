@@ -23,10 +23,21 @@ export function AppTopbar({
         {onToggleSidebar && (
           <button
             onClick={onToggleSidebar}
-            className="p-1.5 rounded-md text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer"
-            title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            className={`px-2 py-1 rounded-md text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 border shadow-2xs shrink-0 ${
+              sidebarCollapsed
+                ? "border-blue-300 bg-blue-50 text-[#1976D2] hover:bg-blue-100"
+                : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+            }`}
+            title={sidebarCollapsed ? "Maximize navigation panel (Ctrl+B)" : "Minimize navigation panel (Ctrl+B)"}
+            aria-label={sidebarCollapsed ? "Maximize navigation panel" : "Minimize navigation panel"}
           >
-            <Menu className="h-4 w-4" />
+            <Menu className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline text-[11px] font-semibold">
+              {sidebarCollapsed ? "Expand Menu" : "Menu"}
+            </span>
+            <kbd className="hidden lg:inline text-[9px] font-mono text-slate-400 bg-slate-100 px-1 py-0.2 rounded border border-slate-200">
+              Ctrl+B
+            </kbd>
           </button>
         )}
         <button

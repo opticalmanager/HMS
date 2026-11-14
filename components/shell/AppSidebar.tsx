@@ -74,8 +74,9 @@ export function AppSidebar({ collapsed = false, onToggleCollapse }: AppSidebarPr
         {onToggleCollapse && !collapsed && (
           <button
             onClick={onToggleCollapse}
-            className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
-            title="Collapse sidebar (maximize workspace)"
+            className="p-1.5 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+            title="Minimize navigation panel (Ctrl+B)"
+            aria-label="Minimize navigation panel"
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
@@ -83,6 +84,16 @@ export function AppSidebar({ collapsed = false, onToggleCollapse }: AppSidebarPr
       </div>
 
       <nav className="flex-1 px-2 py-3 space-y-1 overflow-y-auto">
+        {collapsed && onToggleCollapse && (
+          <button
+            onClick={onToggleCollapse}
+            className="w-full mb-2 py-1.5 flex items-center justify-center rounded-md text-slate-500 hover:text-[#2563EB] hover:bg-blue-50 border border-slate-200 transition-colors cursor-pointer shadow-2xs"
+            title="Maximize navigation panel (Ctrl+B)"
+            aria-label="Maximize navigation panel"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        )}
         {!collapsed && (
           <div className="px-2 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
             Modules (12)

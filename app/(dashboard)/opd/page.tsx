@@ -150,26 +150,26 @@ export default function OpdPage() {
       : "MALE · (28Y)";
 
   return (
-    <div className="flex flex-col min-h-screen bg-slate-50/40 space-y-2 select-none pb-6">
+    <div className="flex flex-col h-full max-h-full gap-1.5 overflow-hidden select-none min-w-0">
       {/* =========================================================================
           TOP COMPACT CLINICAL HEADER BAR (No bulky banners - h-11 maximum density)
           Exact replica of the provided Healthray screenshot
          ========================================================================= */}
-      <header className="h-11 bg-white border border-slate-200 rounded-lg shadow-2xs px-3 flex items-center justify-between gap-2 text-xs">
+      <header className="h-11 bg-white border border-slate-200 rounded-lg shadow-2xs px-3 flex items-center justify-between gap-2 text-xs shrink-0">
         {/* Left: Patient Profile & Demographics Strip */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0 min-w-0">
           {/* Avatar Circle */}
-          <div className="h-7 w-7 rounded-full bg-[#D32F2F] text-white font-bold flex items-center justify-center text-xs shadow-2xs">
+          <div className="h-7 w-7 rounded-full bg-[#D32F2F] text-white font-bold flex items-center justify-center text-xs shadow-2xs shrink-0">
             {initial}
           </div>
 
           {/* Token Badge */}
-          <span className="font-bold text-[#1976D2] font-mono text-xs">
+          <span className="font-bold text-[#1976D2] font-mono text-xs shrink-0">
             (V{selectedAppointment.tokenNumber})
           </span>
 
           {/* Edit Patient & Info Trigger */}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5 shrink-0">
             <button
               onClick={() => setAddPatientModalOpen(true)}
               className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
@@ -205,23 +205,23 @@ export default function OpdPage() {
           </div>
 
           {/* Demographics Tag */}
-          <span className="px-2 py-0.5 rounded-full border border-slate-200 bg-slate-50 text-slate-700 font-semibold text-[11px]">
+          <span className="px-2 py-0.5 rounded-full border border-slate-200 bg-slate-50 text-slate-700 font-semibold text-[11px] shrink-0">
             {ageGenderStr}
           </span>
 
           {/* Patient Name */}
-          <div className="font-black text-slate-900 text-xs tracking-tight uppercase">
+          <div className="font-black text-slate-900 text-xs tracking-tight uppercase truncate max-w-[130px] md:max-w-[180px] xl:max-w-[240px]">
             {selectedAppointment.patientName}
           </div>
 
           {/* Referral Source */}
-          <span className="text-[10px] text-slate-400 border border-slate-200 rounded px-1.5 py-0.5 font-medium">
+          <span className="text-[10px] text-slate-400 border border-slate-200 rounded px-1.5 py-0.5 font-medium shrink-0 hidden 2xl:inline-flex">
             Ref. By: Self
           </span>
         </div>
 
         {/* Center: Search Patient Input (Crisp, non-collapsing) */}
-        <div className="relative w-48 xl:w-60 shrink-0 hidden md:block">
+        <div className="relative w-32 md:w-40 lg:w-48 xl:w-56 shrink-1 hidden md:block">
           <Search className="h-3 w-3 text-slate-400 absolute left-2.5 top-2 pointer-events-none" />
           <Input
             placeholder="Search patient..."
@@ -240,11 +240,11 @@ export default function OpdPage() {
         </div>
 
         {/* Right: Functional Action Pill Buttons */}
-        <div className="flex items-center gap-1.5 shrink-0 overflow-x-auto">
+        <div className="flex items-center gap-1 xl:gap-1.5 shrink-0">
           {/* 1. Bill Button (Red/Coral border) */}
           <button
             onClick={() => setBillingModalOpen(true)}
-            className="px-2.5 py-1 rounded-full border border-rose-300 bg-rose-50/50 text-rose-700 hover:bg-rose-100/70 font-semibold text-[11px] transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
+            className="px-2.5 py-1 rounded-full border border-rose-300 bg-rose-50/60 text-rose-700 hover:bg-rose-100 font-semibold text-[11px] transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
             title="Generate OPD Bill & Thermal Receipt"
           >
             <Receipt className="h-3 w-3 text-rose-600" />
@@ -262,13 +262,13 @@ export default function OpdPage() {
             title="Patient Allergy records"
           >
             <AlertTriangle className="h-3 w-3 text-amber-500" />
-            <span>Allergy {patientAllergies.length > 0 ? `(${patientAllergies.length})` : ""}</span>
+            <span>Allergy{patientAllergies.length > 0 ? ` (${patientAllergies.length})` : ""}</span>
           </button>
 
           {/* 3. Reminder Button (Blue border) */}
           <button
             onClick={() => setReminderModalOpen(true)}
-            className="px-2.5 py-1 rounded-full border border-blue-300 bg-blue-50/50 text-blue-700 hover:bg-blue-100/70 font-semibold text-[11px] transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
+            className="px-2.5 py-1 rounded-full border border-blue-300 bg-blue-50/60 text-blue-700 hover:bg-blue-100 font-semibold text-[11px] transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
             title="Schedule WhatsApp / SMS reminder"
           >
             <Bell className="h-3 w-3 text-blue-600" />
@@ -282,13 +282,13 @@ export default function OpdPage() {
             title="Comprehensive EMR Case Sheet"
           >
             <FileText className="h-3 w-3 text-slate-500" />
-            <span>Patient Report</span>
+            <span><span className="hidden xl:inline">Patient </span>Report</span>
           </button>
 
           {/* 5. Graph Button (Purple border) */}
           <button
             onClick={() => setGraphModalOpen(true)}
-            className="px-2.5 py-1 rounded-full border border-purple-300 bg-purple-50/50 text-purple-700 hover:bg-purple-100/70 font-semibold text-[11px] transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
+            className="px-2.5 py-1 rounded-full border border-purple-300 bg-purple-50/60 text-purple-700 hover:bg-purple-100 font-semibold text-[11px] transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
             title="Vitals Trend Graph"
           >
             <LineChart className="h-3 w-3 text-purple-600" />
@@ -298,7 +298,7 @@ export default function OpdPage() {
           {/* 6. + Appt Button (Primary Blue Solid) */}
           <button
             onClick={() => setBookingModalOpen(true)}
-            className="px-3 py-1 rounded-full bg-[#1976D2] hover:bg-blue-700 text-white font-semibold text-[11px] shadow-xs transition-colors cursor-pointer flex items-center gap-1"
+            className="px-2.5 lg:px-3 py-1 rounded-full bg-[#1976D2] hover:bg-blue-700 text-white font-semibold text-[11px] shadow-xs transition-colors cursor-pointer flex items-center gap-1"
             title="Add Next Appointment"
           >
             <CalendarPlus className="h-3 w-3" />
@@ -308,7 +308,7 @@ export default function OpdPage() {
           {/* 7. + Patient Button (Primary Blue Solid) */}
           <button
             onClick={() => setAddPatientModalOpen(true)}
-            className="px-3 py-1 rounded-full bg-[#1976D2] hover:bg-blue-700 text-white font-semibold text-[11px] shadow-xs transition-colors cursor-pointer flex items-center gap-1"
+            className="px-2.5 lg:px-3 py-1 rounded-full bg-[#1976D2] hover:bg-blue-700 text-white font-semibold text-[11px] shadow-xs transition-colors cursor-pointer flex items-center gap-1"
             title="Add New Walk-In Patient"
           >
             <UserPlus className="h-3 w-3" />
@@ -353,43 +353,43 @@ export default function OpdPage() {
       {/* =========================================================================
           SUB-HEADER / VISIT STATUS STRIP (High-density h-8 bar from screenshot)
          ========================================================================= */}
-      <div className="bg-white border border-slate-200 rounded-lg px-3 py-1 shadow-2xs flex items-center justify-between text-xs text-slate-600 whitespace-nowrap overflow-x-auto select-none">
-        <div className="flex items-center gap-2">
-          <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
-          <span className="font-bold text-[#D32F2F]">Walk-In</span>
-          <span className="text-slate-400">/</span>
-          <span className="font-semibold text-slate-700">Confirmed</span>
+      <div className="h-8 min-h-[2rem] max-h-[2rem] bg-white border border-slate-200 rounded-lg px-3 shadow-2xs flex items-center justify-between text-xs text-slate-600 whitespace-nowrap overflow-hidden select-none shrink-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <ChevronDown className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+          <span className="font-bold text-[#D32F2F] shrink-0">Walk-In</span>
+          <span className="text-slate-400 shrink-0">/</span>
+          <span className="font-semibold text-slate-700 shrink-0">Confirmed</span>
 
-          <span className="text-slate-700 font-medium ml-2">
+          <span className="text-slate-700 font-medium ml-1.5 shrink-0 hidden sm:inline">
             Monday 16/11/2026 13:00:00
           </span>
 
-          <span className="px-2 py-0.2 rounded-full border border-blue-200 bg-blue-50 text-[#1976D2] font-semibold text-[10px]">
+          <span className="px-1.5 py-0.2 rounded-full border border-blue-200 bg-blue-50 text-[#1976D2] font-semibold text-[10px] shrink-0">
             System
           </span>
 
-          <span className="text-slate-500 font-medium">
+          <span className="text-slate-500 font-medium truncate hidden md:inline">
             (New Appointment - Lajpatnagar)
           </span>
 
           <button
             onClick={() => setUploadModalOpen(true)}
-            className="text-[#1976D2] hover:text-blue-800 font-semibold underline cursor-pointer ml-1 text-xs"
+            className="text-[#1976D2] hover:text-blue-800 font-semibold underline cursor-pointer ml-1 text-xs shrink-0"
           >
             Upload Document
           </button>
         </div>
 
-        <div className="flex items-center gap-1.5 font-semibold text-slate-800 text-[11px] shrink-0 pl-3">
-          <Info className="h-3.5 w-3.5 text-slate-400" />
-          <span>{selectedAppointment.doctorName || "Dr. Rajeev Prasad"} (Optometrists)</span>
+        <div className="flex items-center gap-1.5 font-semibold text-slate-800 text-[11px] shrink-0 pl-3 border-l border-slate-100">
+          <Info className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+          <span className="truncate">{selectedAppointment.doctorName || "Dr. Rajeev Prasad"} (Optometrists)</span>
         </div>
       </div>
 
       {/* =========================================================================
           MAIN WORKSPACE: Left Queue Drawer + Right Consultation Pad
          ========================================================================= */}
-      <div className="flex items-start gap-2 w-full">
+      <div className="flex-1 min-h-0 flex items-stretch gap-2 w-full overflow-hidden">
         {/* Left Queue Panel */}
         <OpdPatientQueueDrawer
           queue={store.appointments}

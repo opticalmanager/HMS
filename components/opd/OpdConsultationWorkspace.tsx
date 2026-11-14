@@ -372,9 +372,9 @@ export function OpdConsultationWorkspace({
   };
 
   return (
-    <div className="flex-1 flex flex-col bg-white border border-slate-200 rounded-lg shadow-2xs overflow-hidden h-[calc(100vh-7.5rem)] text-xs">
+    <div className="flex-1 min-w-0 flex flex-col bg-white border border-slate-200 rounded-lg shadow-2xs overflow-hidden h-full text-xs">
       {/* 1. Sleek Document Attachment Bar (Lean & Collapsed by Default) */}
-      <div className="border-b border-slate-200 bg-white select-none">
+      <div className="border-b border-slate-200 bg-white select-none shrink-0">
         <div className="px-3 py-1.5 flex items-center justify-between bg-slate-50/40">
           <button
             onClick={() => setAttachmentsExpanded((v) => !v)}
@@ -447,15 +447,15 @@ export function OpdConsultationWorkspace({
       </div>
 
       {/* 2. Sleek Clinical Navigation Tabs (No Clutter, Clean Underlines) */}
-      <div className="flex items-center gap-0.5 border-b border-slate-200 px-3 bg-slate-50/60 select-none overflow-x-auto shrink-0">
+      <div className="flex items-center gap-1 border-b border-slate-200 px-3 bg-slate-50/60 select-none overflow-x-auto shrink-0">
         {[
-          { key: "symptoms", label: "Symptoms & History", icon: Stethoscope },
-          { key: "vitals", label: "Vitals", icon: Heart },
-          { key: "diagnosis", label: "Diagnosis (ICD-10)", icon: FileCheck },
-          { key: "rx", label: "Rx Prescriptions", icon: Pill },
-          { key: "investigations", label: "Investigations", icon: Microscope },
-          { key: "advice", label: "Advice & Follow-Up", icon: Info },
-          { key: "notes", label: "Doctor Notes", icon: FileText },
+          { key: "symptoms", label: "Symptoms", fullLabel: "Symptoms & History", icon: Stethoscope, count: 0 },
+          { key: "vitals", label: "Vitals", fullLabel: "Vitals", icon: Heart, count: 0 },
+          { key: "diagnosis", label: "Diagnosis", fullLabel: "Diagnosis (ICD-10)", icon: FileCheck, count: diagnoses.length },
+          { key: "rx", label: "Rx Prescriptions", fullLabel: "Rx Prescriptions", icon: Pill, count: prescriptions.length },
+          { key: "investigations", label: "Investigations", fullLabel: "Investigations", icon: Microscope, count: investigations.length },
+          { key: "advice", label: "Advice", fullLabel: "Advice & Follow-Up", icon: Info, count: adviceList.length },
+          { key: "notes", label: "Doctor Notes", fullLabel: "Doctor Notes", icon: FileText, count: 0 },
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.key;
@@ -463,14 +463,22 @@ export function OpdConsultationWorkspace({
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key as any)}
-              className={`py-2 px-3 border-b-2 text-[11px] font-semibold flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap ${
+              className={`py-2 px-2.5 border-b-2 text-[11px] font-semibold flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap ${
                 isActive
                   ? "border-[#1976D2] text-[#1976D2] bg-white font-bold"
-                  : "border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/50"
+                  : "border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/60"
               }`}
             >
-              <Icon className="h-3.5 w-3.5" />
-              <span>{tab.label}</span>
+              <Icon className="h-3.5 w-3.5 shrink-0" />
+              <span className="hidden xl:inline">{tab.fullLabel}</span>
+              <span className="inline xl:hidden">{tab.label}</span>
+              {tab.count > 0 && (
+                <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-bold font-mono ${
+                  isActive ? "bg-blue-100 text-[#1976D2]" : "bg-slate-200 text-slate-600"
+                }`}>
+                  {tab.count}
+                </span>
+              )}
             </button>
           );
         })}
@@ -984,14 +992,14 @@ export function OpdConsultationWorkspace({
       </div>
 
       {/* 4. Docked Bottom Action Bar (Fixed, Crisp, No Vertical Scrolling needed) */}
-      <div className="p-2.5 border-t border-slate-200 bg-slate-50/90 flex items-center justify-between gap-2 shrink-0">
+      <div className="p-2.5 border-t border-slate-200 bg-slate-50/95 flex items-center justify-between gap-2 shrink-0 select-none">
         <div className="flex items-center gap-2">
           <Button
             type="button"
             variant="outline"
             size="sm"
             onClick={handleSaveDraft}
-            className="text-xs h-7 gap-1.5 border-slate-300 bg-white cursor-pointer"
+            className="text-xs h-7.5 gap-1.5 border-slate-300 bg-white hover:bg-slate-50 cursor-pointer shadow-2xs"
           >
             <Save className="h-3 w-3" />
             {isSavedFeedback ? "Saved Draft!" : "Save Draft"}
@@ -1002,7 +1010,7 @@ export function OpdConsultationWorkspace({
             variant="outline"
             size="sm"
             onClick={onOpenPrintModal}
-            className="text-xs h-7 gap-1.5 border-slate-300 bg-white cursor-pointer"
+            className="text-xs h-7.5 gap-1.5 border-slate-300 bg-white hover:bg-slate-50 cursor-pointer shadow-2xs"
           >
             <Printer className="h-3 w-3" />
             Print Rx
@@ -1013,7 +1021,7 @@ export function OpdConsultationWorkspace({
             variant="outline"
             size="sm"
             onClick={handleSendWhatsAppSlip}
-            className="text-xs h-7 gap-1.5 border-emerald-300 text-emerald-800 bg-emerald-50/50 hover:bg-emerald-100 cursor-pointer"
+            className="text-xs h-7.5 gap-1.5 border-emerald-300 text-emerald-800 bg-emerald-50/60 hover:bg-emerald-100 cursor-pointer shadow-2xs font-semibold"
           >
             <Send className="h-3 w-3 text-emerald-600" />
             WhatsApp Slip
@@ -1024,7 +1032,7 @@ export function OpdConsultationWorkspace({
             variant="outline"
             size="sm"
             onClick={onOpenBillingModal}
-            className="text-xs h-7 gap-1.5 border-rose-300 text-rose-800 bg-rose-50/50 hover:bg-rose-100 cursor-pointer"
+            className="text-xs h-7.5 gap-1.5 border-rose-300 text-rose-800 bg-rose-50/60 hover:bg-rose-100 cursor-pointer shadow-2xs font-semibold"
           >
             <Receipt className="h-3 w-3 text-rose-600" />
             Create OPD Bill
@@ -1035,9 +1043,9 @@ export function OpdConsultationWorkspace({
           type="button"
           size="sm"
           onClick={handleCompleteConsultation}
-          className="text-xs h-7 gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold cursor-pointer shadow-xs"
+          className="text-xs h-7.5 gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold cursor-pointer shadow-xs"
         >
-          <CheckCircle2 className="h-3 w-3" />
+          <CheckCircle2 className="h-3.5 w-3.5" />
           Sign & Complete Consultation
         </Button>
       </div>

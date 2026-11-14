@@ -18,12 +18,22 @@ export default function DashboardLayout({
   const [isOffline, setIsOffline] = React.useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
 
-  // Auto-collapse sidebar on OPD clinical desk to provide doctors maximum horizontal workspace
+  // Global Keyboard Shortcut: Ctrl+B or Cmd+B to smartly toggle navigation sidebar
   React.useEffect(() => {
-    if (isOpd) {
-      setSidebarCollapsed(true);
-    }
-  }, [isOpd]);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === "b" || e.key === "B")) {
+        // Do not intercept if actively typing in an input or textarea
+        const tag = document.activeElement?.tagName?.toLowerCase();
+        if (tag === "input" || tag === "textarea") {
+          return;
+        }
+        e.preventDefault();
+        setSidebarCollapsed((v) => !v);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   React.useEffect(() => {
     const handleOnline = () => setIsOffline(false);
@@ -52,7 +62,14 @@ export default function DashboardLayout({
           sidebarCollapsed={sidebarCollapsed}
           onToggleSidebar={() => setSidebarCollapsed((v) => !v)}
         />
-        <main className={cn("flex-1 overflow-y-auto", isOpd ? "p-2" : "p-6")}>
+        <main
+          className={cn(
+            "flex-1 min-w-0",
+            isOpd
+              ? "h-[calc(100vh-3rem)] max-h-[calc(100vh-3rem)] overflow-hidden p-2 flex flex-col"
+              : "overflow-y-auto p-6"
+          )}
+        >
           {children}
         </main>
       </div>
