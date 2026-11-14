@@ -5,7 +5,7 @@ import { Volume2, VolumeX, Building2, Clock, Users, BellRing, Play, Sparkles } f
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { audioChime } from "@/utils/audio-chime";
-import { useClinicalStore } from "@/services/clinical-store";
+import { useClinicalStore, clinicalStore } from "@/services/clinical-store";
 
 interface CabinToken {
   room: string;
@@ -90,9 +90,23 @@ export function TokenDisplayScreen() {
     audioChime.setMuted(nextMuted);
   };
 
-  // Call token for a specific cabin with audio chime
+  // Call token for a specific cabin with audio chime & store synchronization
   const handleCallToken = (cabinIdx: number) => {
-    const nextNum = cabins[cabinIdx].token + 1;
+    // Find next waiting appointment in store
+    const nextWaiting = store.appointments.find(
+      (a) => a.status === "scheduled" || a.status === "arrived"
+    );
+
+    let nextToken = cabins[cabinIdx].token + 1;
+    let nextPatient = "Walk-in Patient";
+
+    if (nextWaiting) {
+      nextToken = nextWaiting.tokenNumber;
+      nextPatient = nextWaiting.patientName || "Waiting Patient";
+      // Transition waiting appointment to in_consultation
+      clinicalStore.updateAppointmentStatus(nextWaiting.id, "in_consultation");
+    }
+
     audioChime.playChime(0.7);
 
     setCabins((prev) =>
@@ -100,13 +114,14 @@ export function TokenDisplayScreen() {
         i === cabinIdx
           ? {
               ...c,
-              token: nextNum,
+              token: nextToken,
+              patientName: nextPatient,
               status: "calling",
             }
           : c
       )
     );
-    setLastChimedToken(nextNum);
+    setLastChimedToken(nextToken);
   };
 
   return (

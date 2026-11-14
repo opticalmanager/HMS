@@ -12,6 +12,12 @@ import type {
   IpdAdmission,
   Invoice,
   InventoryItem,
+  DoctorBlock,
+  DoctorWeeklySchedule,
+  PatientAllergy,
+  ClinicalAttachment,
+  LabInvestigationOrder,
+  OpdConsultationRecord,
 } from "@/types/hms";
 
 // --- Clinical Data Model Interfaces ---
@@ -174,7 +180,12 @@ export type RbacMatrix = Record<RbacRole, Record<RbacPermission, boolean>>;
 export interface ClinicalStoreState {
   patients: Patient[];
   appointments: Appointment[];
+  doctorBlocks: DoctorBlock[];
+  doctorAvailabilities: Record<string, DoctorWeeklySchedule>;
   consultations: OpdConsultation[];
+  patientAllergies: PatientAllergy[];
+  clinicalAttachments: ClinicalAttachment[];
+  opdConsultations: Record<string, OpdConsultationRecord>;
   beds: Bed[];
   admissions: IpdAdmission[];
   nursingMar: NursingMarRecord[];
@@ -190,6 +201,84 @@ export interface ClinicalStoreState {
 }
 
 // --- Initial Realistic Hospital Dataset ---
+
+const INITIAL_DOCTOR_BLOCKS: DoctorBlock[] = [
+  {
+    id: "blk-1",
+    doctorId: "doc-1",
+    doctorName: "Dr. Gaurav Kumar",
+    startDate: "2026-11-14",
+    endDate: "2026-11-14",
+    startTime: "01:00 PM",
+    endTime: "02:00 PM",
+    reason: "lunch",
+    notes: "Regular OPD Lunch Break",
+    createdAt: "2026-11-14T08:00:00Z",
+  },
+  {
+    id: "blk-2",
+    doctorId: "doc-3",
+    doctorName: "Dr. Rajesh Varma",
+    startDate: "2026-11-14",
+    endDate: "2026-11-14",
+    startTime: "02:00 PM",
+    endTime: "04:30 PM",
+    reason: "ot_surgery",
+    notes: "Total Knee Replacement OT Procedure",
+    createdAt: "2026-11-14T08:00:00Z",
+  },
+];
+
+const INITIAL_DOCTOR_AVAILABILITIES: Record<string, DoctorWeeklySchedule> = {
+  "doc-1": {
+    doctorId: "doc-1",
+    doctorName: "Dr. Gaurav Kumar",
+    department: "Cardiology",
+    slotDurationMinutes: 15,
+    maxOverbookingSlots: 5,
+    days: {
+      0: { isActive: false, morningStart: "09:00", morningEnd: "13:00", eveningStart: "16:00", eveningEnd: "20:00" },
+      1: { isActive: true, morningStart: "09:00", morningEnd: "13:00", eveningStart: "16:00", eveningEnd: "20:00" },
+      2: { isActive: true, morningStart: "09:00", morningEnd: "13:00", eveningStart: "16:00", eveningEnd: "20:00" },
+      3: { isActive: true, morningStart: "09:00", morningEnd: "13:00", eveningStart: "16:00", eveningEnd: "20:00" },
+      4: { isActive: true, morningStart: "09:00", morningEnd: "13:00", eveningStart: "16:00", eveningEnd: "20:00" },
+      5: { isActive: true, morningStart: "09:00", morningEnd: "13:00", eveningStart: "16:00", eveningEnd: "20:00" },
+      6: { isActive: true, morningStart: "09:00", morningEnd: "14:00", eveningStart: "16:00", eveningEnd: "18:00" },
+    },
+  },
+  "doc-2": {
+    doctorId: "doc-2",
+    doctorName: "Dr. Ananya Sharma",
+    department: "General Medicine",
+    slotDurationMinutes: 15,
+    maxOverbookingSlots: 6,
+    days: {
+      0: { isActive: false, morningStart: "09:00", morningEnd: "13:00", eveningStart: "16:00", eveningEnd: "20:00" },
+      1: { isActive: true, morningStart: "09:30", morningEnd: "13:30", eveningStart: "16:30", eveningEnd: "20:30" },
+      2: { isActive: true, morningStart: "09:30", morningEnd: "13:30", eveningStart: "16:30", eveningEnd: "20:30" },
+      3: { isActive: true, morningStart: "09:30", morningEnd: "13:30", eveningStart: "16:30", eveningEnd: "20:30" },
+      4: { isActive: true, morningStart: "09:30", morningEnd: "13:30", eveningStart: "16:30", eveningEnd: "20:30" },
+      5: { isActive: true, morningStart: "09:30", morningEnd: "13:30", eveningStart: "16:30", eveningEnd: "20:30" },
+      6: { isActive: true, morningStart: "09:30", morningEnd: "14:00", eveningStart: "16:00", eveningEnd: "19:00" },
+    },
+  },
+  "doc-3": {
+    doctorId: "doc-3",
+    doctorName: "Dr. Rajesh Varma",
+    department: "Orthopedics",
+    slotDurationMinutes: 20,
+    maxOverbookingSlots: 4,
+    days: {
+      0: { isActive: false, morningStart: "10:00", morningEnd: "13:00", eveningStart: "16:00", eveningEnd: "19:00" },
+      1: { isActive: true, morningStart: "10:00", morningEnd: "13:00", eveningStart: "16:00", eveningEnd: "19:00" },
+      2: { isActive: true, morningStart: "10:00", morningEnd: "13:00", eveningStart: "16:00", eveningEnd: "19:00" },
+      3: { isActive: true, morningStart: "10:00", morningEnd: "13:00", eveningStart: "16:00", eveningEnd: "19:00" },
+      4: { isActive: true, morningStart: "10:00", morningEnd: "13:00", eveningStart: "16:00", eveningEnd: "19:00" },
+      5: { isActive: true, morningStart: "10:00", morningEnd: "13:00", eveningStart: "16:00", eveningEnd: "19:00" },
+      6: { isActive: true, morningStart: "10:00", morningEnd: "13:00", eveningStart: "16:00", eveningEnd: "18:00" },
+    },
+  },
+};
 
 const INITIAL_PATIENTS: Patient[] = [
   {
@@ -305,6 +394,96 @@ const INITIAL_PATIENTS: Patient[] = [
     createdAt: "2026-11-10T14:20:00Z",
     updatedAt: "2026-11-14T09:00:00Z",
   },
+  {
+    id: "pat-vijay-189",
+    uhid: "UHID-2026-0189",
+    organizationId: "org-apex-001",
+    branchId: "br-main-001",
+    fullName: "MR. VIJAY",
+    gender: "male",
+    age: 22,
+    dateOfBirth: "2004-03-15",
+    phone: "+91 7015511542",
+    city: "New Delhi",
+    pincode: "110024",
+    bloodGroup: "B+",
+    allergies: ["Sulfa Drugs"],
+    chronicConditions: ["Myopia (Bilateral)"],
+    createdAt: "2026-11-14T08:00:00Z",
+    updatedAt: "2026-11-14T08:00:00Z",
+  },
+  {
+    id: "pat-sreya-188",
+    uhid: "UHID-2026-0188",
+    organizationId: "org-apex-001",
+    branchId: "br-main-001",
+    fullName: "MS. SREYA SANGHAI",
+    gender: "female",
+    age: 24,
+    dateOfBirth: "2002-07-21",
+    phone: "+91 9773721991",
+    city: "New Delhi",
+    pincode: "110024",
+    bloodGroup: "O+",
+    allergies: ["Penicillin"],
+    chronicConditions: [],
+    createdAt: "2026-11-14T08:30:00Z",
+    updatedAt: "2026-11-14T08:30:00Z",
+  },
+  {
+    id: "pat-vimal-187",
+    uhid: "UHID-2026-0187",
+    organizationId: "org-apex-001",
+    branchId: "br-main-001",
+    fullName: "MR. VIMAL PANDE",
+    gender: "male",
+    age: 63,
+    dateOfBirth: "1963-10-10",
+    phone: "+91 9971583332",
+    city: "New Delhi",
+    pincode: "110024",
+    bloodGroup: "A+",
+    allergies: ["Aspirin"],
+    chronicConditions: ["Hypertension", "Presbyopia"],
+    createdAt: "2026-11-14T09:00:00Z",
+    updatedAt: "2026-11-14T09:00:00Z",
+  },
+  {
+    id: "pat-kushagra-186",
+    uhid: "UHID-2026-0186",
+    organizationId: "org-apex-001",
+    branchId: "br-main-001",
+    fullName: "MR. KUSHAGRA SRIVASTAVA",
+    gender: "male",
+    age: 27,
+    dateOfBirth: "1999-05-04",
+    phone: "+91 8919362051",
+    city: "New Delhi",
+    pincode: "110024",
+    bloodGroup: "B+",
+    allergies: [],
+    chronicConditions: ["Astigmatism"],
+    createdAt: "2026-11-14T09:30:00Z",
+    updatedAt: "2026-11-14T09:30:00Z",
+  },
+  {
+    id: "pat-ashdik",
+    uhid: "UHID-2026-0185",
+    organizationId: "org-apex-001",
+    branchId: "br-main-001",
+    fullName: "MASTER ASHDIK",
+    gender: "male",
+    age: 5,
+    dateOfBirth: "2021-08-14",
+    phone: "+91 6395850199",
+    city: "New Delhi",
+    pincode: "110024",
+    bloodGroup: "O+",
+    allergies: [],
+    chronicConditions: ["Amblyopia Screening"],
+    createdAt: "2026-11-14T10:00:00Z",
+    updatedAt: "2026-11-14T10:00:00Z",
+  },
 ];
 
 const INITIAL_APPOINTMENTS: Appointment[] = [
@@ -396,21 +575,549 @@ const INITIAL_APPOINTMENTS: Appointment[] = [
     createdAt: "2026-11-14T09:30:00Z",
     updatedAt: "2026-11-14T09:30:00Z",
   },
+  {
+    id: "apt-v189",
+    organizationId: "org-apex-001",
+    branchId: "br-main-001",
+    patientId: "pat-vijay-189",
+    patientName: "MR. VIJAY",
+    patientPhone: "+91 7015511542",
+    patientUhid: "UHID-2026-0189",
+    doctorId: "doc-1",
+    doctorName: "Dr. Rajeev Prasad",
+    department: "Optometry & Eye Care",
+    tokenNumber: 189,
+    appointmentDate: "2026-11-16",
+    timeSlot: "01:00 PM",
+    status: "in_consultation",
+    priority: "normal",
+    source: "sys",
+    appointmentType: "new",
+    chiefComplaints: "Blurry distance vision, ocular strain with screen work",
+    consultationFee: 500,
+    isPaid: true,
+    notes: "New Appointment - Lajpatnagar [Walk-In / Confirmed]",
+    createdAt: "2026-11-14T08:00:00Z",
+    updatedAt: "2026-11-14T08:00:00Z",
+  },
+  {
+    id: "apt-v188",
+    organizationId: "org-apex-001",
+    branchId: "br-main-001",
+    patientId: "pat-sreya-188",
+    patientName: "MS. SREYA SANGHAI",
+    patientPhone: "+91 9773721991",
+    patientUhid: "UHID-2026-0188",
+    doctorId: "doc-1",
+    doctorName: "Dr. Rajeev Prasad",
+    department: "Optometry & Eye Care",
+    tokenNumber: 188,
+    appointmentDate: "2026-11-16",
+    timeSlot: "01:30 PM",
+    status: "arrived",
+    priority: "normal",
+    source: "sys",
+    appointmentType: "new",
+    chiefComplaints: "Contact lens irritation & dry eye symptoms",
+    consultationFee: 500,
+    isPaid: true,
+    notes: "Walk-In / Confirmed",
+    createdAt: "2026-11-14T08:30:00Z",
+    updatedAt: "2026-11-14T08:30:00Z",
+  },
+  {
+    id: "apt-v187",
+    organizationId: "org-apex-001",
+    branchId: "br-main-001",
+    patientId: "pat-vimal-187",
+    patientName: "MR. VIMAL PANDE",
+    patientPhone: "+91 9971583332",
+    patientUhid: "UHID-2026-0187",
+    doctorId: "doc-1",
+    doctorName: "Dr. Rajeev Prasad",
+    department: "Optometry & Eye Care",
+    tokenNumber: 187,
+    appointmentDate: "2026-11-16",
+    timeSlot: "02:00 PM",
+    status: "arrived",
+    priority: "normal",
+    source: "sys",
+    appointmentType: "new",
+    chiefComplaints: "Near vision blurring, reading difficulty (Presbyopia check)",
+    consultationFee: 500,
+    isPaid: true,
+    notes: "Walk-In / Confirmed",
+    createdAt: "2026-11-14T09:00:00Z",
+    updatedAt: "2026-11-14T09:00:00Z",
+  },
+  {
+    id: "apt-v186",
+    organizationId: "org-apex-001",
+    branchId: "br-main-001",
+    patientId: "pat-kushagra-186",
+    patientName: "MR. KUSHAGRA SRIVASTAVA",
+    patientPhone: "+91 8919362051",
+    patientUhid: "UHID-2026-0186",
+    doctorId: "doc-1",
+    doctorName: "Dr. Rajeev Prasad",
+    department: "Optometry & Eye Care",
+    tokenNumber: 186,
+    appointmentDate: "2026-11-16",
+    timeSlot: "02:30 PM",
+    status: "arrived",
+    priority: "normal",
+    source: "sys",
+    appointmentType: "new",
+    chiefComplaints: "Headaches while coding, astigmatism evaluation",
+    consultationFee: 500,
+    isPaid: true,
+    notes: "Walk-In / Confirmed",
+    createdAt: "2026-11-14T09:30:00Z",
+    updatedAt: "2026-11-14T09:30:00Z",
+  },
+  {
+    id: "apt-v185",
+    organizationId: "org-apex-001",
+    branchId: "br-main-001",
+    patientId: "pat-ashdik",
+    patientName: "Master ASHDIK",
+    patientPhone: "9871900034",
+    patientUhid: "UHID-2026-0185",
+    doctorId: "doc-1",
+    doctorName: "Dr. Gaurav Kumar",
+    department: "Pediatrics & Eye Care",
+    tokenNumber: 185,
+    appointmentDate: "2026-11-14",
+    timeSlot: "11:30 AM",
+    status: "scheduled",
+    priority: "normal",
+    source: "sys",
+    appointmentType: "new",
+    chiefComplaints: "New Appointment - Lajpatnagar",
+    consultationFee: 750,
+    isPaid: true,
+    notes: "Lajpatnagar Center referral",
+    createdAt: "2026-11-14T08:00:00Z",
+    updatedAt: "2026-11-14T08:00:00Z",
+  },
+  {
+    id: "apt-101",
+    organizationId: "org-apex-001",
+    branchId: "br-main-001",
+    patientId: "pat-1",
+    patientName: "Ramesh Patel",
+    patientPhone: "9823012345",
+    patientUhid: "UHID-2026-0041",
+    doctorId: "doc-1",
+    doctorName: "Dr. Gaurav Kumar",
+    department: "Cardiology",
+    tokenNumber: 101,
+    appointmentDate: "2026-11-01",
+    timeSlot: "09:30 AM",
+    status: "completed",
+    priority: "normal",
+    source: "online",
+    consultationFee: 800,
+    isPaid: true,
+    createdAt: "2026-11-01T08:30:00Z",
+    updatedAt: "2026-11-01T10:00:00Z",
+  },
+  {
+    id: "apt-102",
+    organizationId: "org-apex-001",
+    branchId: "br-main-001",
+    patientId: "pat-2",
+    patientName: "Sunita Roy",
+    patientPhone: "9823098765",
+    patientUhid: "UHID-2026-0042",
+    doctorId: "doc-2",
+    doctorName: "Dr. Ananya Sharma",
+    department: "General Medicine",
+    tokenNumber: 102,
+    appointmentDate: "2026-11-01",
+    timeSlot: "10:00 AM",
+    status: "completed",
+    priority: "normal",
+    source: "walk_in",
+    consultationFee: 500,
+    isPaid: true,
+    createdAt: "2026-11-01T08:30:00Z",
+    updatedAt: "2026-11-01T10:30:00Z",
+  },
+  {
+    id: "apt-103",
+    organizationId: "org-apex-001",
+    branchId: "br-main-001",
+    patientId: "pat-3",
+    patientName: "Vikram Singh",
+    patientPhone: "9876543210",
+    patientUhid: "UHID-2026-0043",
+    doctorId: "doc-3",
+    doctorName: "Dr. Rajesh Varma",
+    department: "Orthopedics",
+    tokenNumber: 103,
+    appointmentDate: "2026-11-01",
+    timeSlot: "10:30 AM",
+    status: "completed",
+    priority: "urgent",
+    source: "sys",
+    consultationFee: 700,
+    isPaid: true,
+    createdAt: "2026-11-01T08:30:00Z",
+    updatedAt: "2026-11-01T11:00:00Z",
+  },
+  {
+    id: "apt-201",
+    organizationId: "org-apex-001",
+    branchId: "br-main-001",
+    patientId: "pat-4",
+    patientName: "Pooja Mehta",
+    patientPhone: "9811223344",
+    patientUhid: "UHID-2026-0044",
+    doctorId: "doc-1",
+    doctorName: "Dr. Gaurav Kumar",
+    department: "Cardiology",
+    tokenNumber: 201,
+    appointmentDate: "2026-11-02",
+    timeSlot: "10:00 AM",
+    status: "completed",
+    priority: "normal",
+    source: "online",
+    consultationFee: 800,
+    isPaid: true,
+    createdAt: "2026-11-02T08:30:00Z",
+    updatedAt: "2026-11-02T10:30:00Z",
+  },
+  {
+    id: "apt-202",
+    organizationId: "org-apex-001",
+    branchId: "br-main-001",
+    patientId: "pat-5",
+    patientName: "Aakash Mehta",
+    patientPhone: "9899001122",
+    patientUhid: "UHID-2026-0045",
+    doctorId: "doc-1",
+    doctorName: "Dr. Gaurav Kumar",
+    department: "Cardiology",
+    tokenNumber: 202,
+    appointmentDate: "2026-11-02",
+    timeSlot: "11:00 AM",
+    status: "completed",
+    priority: "emergency",
+    source: "walk_in",
+    consultationFee: 800,
+    isPaid: true,
+    createdAt: "2026-11-02T08:30:00Z",
+    updatedAt: "2026-11-02T11:45:00Z",
+  },
+  {
+    id: "apt-401",
+    organizationId: "org-apex-001",
+    branchId: "br-main-001",
+    patientId: "pat-1",
+    patientName: "Ramesh Patel",
+    patientPhone: "9823012345",
+    patientUhid: "UHID-2026-0041",
+    doctorId: "doc-2",
+    doctorName: "Dr. Ananya Sharma",
+    department: "General Medicine",
+    tokenNumber: 401,
+    appointmentDate: "2026-11-04",
+    timeSlot: "09:30 AM",
+    status: "completed",
+    priority: "normal",
+    source: "sys",
+    consultationFee: 500,
+    isPaid: true,
+    createdAt: "2026-11-04T08:30:00Z",
+    updatedAt: "2026-11-04T10:00:00Z",
+  },
+  {
+    id: "apt-501",
+    organizationId: "org-apex-001",
+    branchId: "br-main-001",
+    patientId: "pat-2",
+    patientName: "Sunita Roy",
+    patientPhone: "9823098765",
+    patientUhid: "UHID-2026-0042",
+    doctorId: "doc-3",
+    doctorName: "Dr. Rajesh Varma",
+    department: "Orthopedics",
+    tokenNumber: 501,
+    appointmentDate: "2026-11-05",
+    timeSlot: "11:00 AM",
+    status: "completed",
+    priority: "urgent",
+    source: "online",
+    consultationFee: 700,
+    isPaid: true,
+    createdAt: "2026-11-05T08:30:00Z",
+    updatedAt: "2026-11-05T11:30:00Z",
+  },
+  {
+    id: "apt-601",
+    organizationId: "org-apex-001",
+    branchId: "br-main-001",
+    patientId: "pat-3",
+    patientName: "Vikram Singh",
+    patientPhone: "9876543210",
+    patientUhid: "UHID-2026-0043",
+    doctorId: "doc-1",
+    doctorName: "Dr. Gaurav Kumar",
+    department: "Cardiology",
+    tokenNumber: 601,
+    appointmentDate: "2026-11-06",
+    timeSlot: "10:00 AM",
+    status: "completed",
+    priority: "normal",
+    source: "walk_in",
+    consultationFee: 800,
+    isPaid: true,
+    createdAt: "2026-11-06T08:30:00Z",
+    updatedAt: "2026-11-06T10:30:00Z",
+  },
+  {
+    id: "apt-602",
+    organizationId: "org-apex-001",
+    branchId: "br-main-001",
+    patientId: "pat-4",
+    patientName: "Pooja Mehta",
+    patientPhone: "9811223344",
+    patientUhid: "UHID-2026-0044",
+    doctorId: "doc-2",
+    doctorName: "Dr. Ananya Sharma",
+    department: "General Medicine",
+    tokenNumber: 602,
+    appointmentDate: "2026-11-06",
+    timeSlot: "11:30 AM",
+    status: "completed",
+    priority: "normal",
+    source: "sys",
+    consultationFee: 500,
+    isPaid: true,
+    createdAt: "2026-11-06T08:30:00Z",
+    updatedAt: "2026-11-06T12:00:00Z",
+  },
+  {
+    id: "apt-701",
+    organizationId: "org-apex-001",
+    branchId: "br-main-001",
+    patientId: "pat-5",
+    patientName: "Aakash Mehta",
+    patientPhone: "9899001122",
+    patientUhid: "UHID-2026-0045",
+    doctorId: "doc-3",
+    doctorName: "Dr. Rajesh Varma",
+    department: "Orthopedics",
+    tokenNumber: 701,
+    appointmentDate: "2026-11-07",
+    timeSlot: "10:30 AM",
+    status: "completed",
+    priority: "urgent",
+    source: "online",
+    consultationFee: 700,
+    isPaid: true,
+    createdAt: "2026-11-07T08:30:00Z",
+    updatedAt: "2026-11-07T11:00:00Z",
+  },
+  {
+    id: "apt-801",
+    organizationId: "org-apex-001",
+    branchId: "br-main-001",
+    patientId: "pat-1",
+    patientName: "Ramesh Patel",
+    patientPhone: "9823012345",
+    patientUhid: "UHID-2026-0041",
+    doctorId: "doc-1",
+    doctorName: "Dr. Gaurav Kumar",
+    department: "Cardiology",
+    tokenNumber: 801,
+    appointmentDate: "2026-11-08",
+    timeSlot: "09:30 AM",
+    status: "completed",
+    priority: "normal",
+    source: "sys",
+    consultationFee: 800,
+    isPaid: true,
+    createdAt: "2026-11-08T08:30:00Z",
+    updatedAt: "2026-11-08T10:00:00Z",
+  },
+  {
+    id: "apt-901",
+    organizationId: "org-apex-001",
+    branchId: "br-main-001",
+    patientId: "pat-2",
+    patientName: "Sunita Roy",
+    patientPhone: "9823098765",
+    patientUhid: "UHID-2026-0042",
+    doctorId: "doc-2",
+    doctorName: "Dr. Ananya Sharma",
+    department: "General Medicine",
+    tokenNumber: 901,
+    appointmentDate: "2026-11-09",
+    timeSlot: "10:00 AM",
+    status: "completed",
+    priority: "normal",
+    source: "walk_in",
+    consultationFee: 500,
+    isPaid: true,
+    createdAt: "2026-11-09T08:30:00Z",
+    updatedAt: "2026-11-09T10:30:00Z",
+  },
+  {
+    id: "apt-1001",
+    organizationId: "org-apex-001",
+    branchId: "br-main-001",
+    patientId: "pat-3",
+    patientName: "Vikram Singh",
+    patientPhone: "9876543210",
+    patientUhid: "UHID-2026-0043",
+    doctorId: "doc-3",
+    doctorName: "Dr. Rajesh Varma",
+    department: "Orthopedics",
+    tokenNumber: 1001,
+    appointmentDate: "2026-11-10",
+    timeSlot: "10:00 AM",
+    status: "completed",
+    priority: "emergency",
+    source: "online",
+    consultationFee: 700,
+    isPaid: true,
+    createdAt: "2026-11-10T08:30:00Z",
+    updatedAt: "2026-11-10T10:30:00Z",
+  },
+  {
+    id: "apt-1301",
+    organizationId: "org-apex-001",
+    branchId: "br-main-001",
+    patientId: "pat-4",
+    patientName: "Pooja Mehta",
+    patientPhone: "9811223344",
+    patientUhid: "UHID-2026-0044",
+    doctorId: "doc-1",
+    doctorName: "Dr. Gaurav Kumar",
+    department: "Cardiology",
+    tokenNumber: 1301,
+    appointmentDate: "2026-11-13",
+    timeSlot: "11:00 AM",
+    status: "completed",
+    priority: "normal",
+    source: "sys",
+    consultationFee: 800,
+    isPaid: true,
+    createdAt: "2026-11-13T08:30:00Z",
+    updatedAt: "2026-11-13T11:30:00Z",
+  },
+  {
+    id: "apt-1501",
+    organizationId: "org-apex-001",
+    branchId: "br-main-001",
+    patientId: "pat-5",
+    patientName: "Aakash Mehta",
+    patientPhone: "9899001122",
+    patientUhid: "UHID-2026-0045",
+    doctorId: "doc-1",
+    doctorName: "Dr. Gaurav Kumar",
+    department: "Cardiology",
+    tokenNumber: 1501,
+    appointmentDate: "2026-11-15",
+    timeSlot: "10:00 AM",
+    status: "scheduled",
+    priority: "normal",
+    source: "walk_in",
+    appointmentType: "follow_up",
+    consultationFee: 800,
+    isPaid: false,
+    createdAt: "2026-11-14T09:00:00Z",
+    updatedAt: "2026-11-14T09:00:00Z",
+  },
+  {
+    id: "apt-1601",
+    organizationId: "org-apex-001",
+    branchId: "br-main-001",
+    patientId: "pat-1",
+    patientName: "Ramesh Patel",
+    patientPhone: "9823012345",
+    patientUhid: "UHID-2026-0041",
+    doctorId: "doc-2",
+    doctorName: "Dr. Ananya Sharma",
+    department: "General Medicine",
+    tokenNumber: 1601,
+    appointmentDate: "2026-11-16",
+    timeSlot: "10:30 AM",
+    status: "scheduled",
+    priority: "normal",
+    source: "online",
+    appointmentType: "follow_up",
+    consultationFee: 500,
+    isPaid: false,
+    createdAt: "2026-11-14T09:00:00Z",
+    updatedAt: "2026-11-14T09:00:00Z",
+  },
 ];
+
+const INITIAL_PATIENT_ALLERGIES: PatientAllergy[] = [
+  {
+    id: "allg-1",
+    patientId: "pat-vijay-189",
+    allergyType: "drug",
+    allergen: "Sulfa Drugs (Sulfonamides)",
+    severity: "moderate",
+    reaction: "Erythematous macular rash, pruritus & facial flushing",
+    onsetDate: "2023-04-10",
+    createdAt: "2026-11-14T08:00:00Z",
+  },
+  {
+    id: "allg-2",
+    patientId: "pat-vijay-189",
+    allergyType: "food",
+    allergen: "Peanuts & Tree Nuts",
+    severity: "mild",
+    reaction: "Oral tingling and localized lip edema",
+    onsetDate: "2020-01-15",
+    createdAt: "2026-11-14T08:00:00Z",
+  },
+  {
+    id: "allg-3",
+    patientId: "pat-sreya-188",
+    allergyType: "drug",
+    allergen: "Penicillin & Amoxicillin",
+    severity: "severe",
+    reaction: "Dyspnea, bronchospasm, and anaphylactoid shock risk",
+    onsetDate: "2021-09-18",
+    createdAt: "2026-11-14T08:30:00Z",
+  },
+  {
+    id: "allg-4",
+    patientId: "pat-vimal-187",
+    allergyType: "drug",
+    allergen: "Aspirin & NSAIDs",
+    severity: "moderate",
+    reaction: "Severe epigastric pain, GI irritation & urticaria",
+    onsetDate: "2018-05-22",
+    createdAt: "2026-11-14T09:00:00Z",
+  },
+];
+
+const INITIAL_CLINICAL_ATTACHMENTS: ClinicalAttachment[] = [];
+
+const INITIAL_OPD_CONSULTATIONS: Record<string, OpdConsultationRecord> = {};
 
 const INITIAL_BEDS: Bed[] = [
   { id: "b1", organizationId: "org-apex-001", branchId: "br-main-001", wardId: "w1", wardName: "Cardiology ICU", wardType: "icu", bedNumber: "ICU-01", status: "occupied", dailyRate: 4500, currentPatientId: "pat-5", patientName: "Aakash Mehta" },
   { id: "b2", organizationId: "org-apex-001", branchId: "br-main-001", wardId: "w1", wardName: "Cardiology ICU", wardType: "icu", bedNumber: "ICU-02", status: "available", dailyRate: 4500 },
   { id: "b3", organizationId: "org-apex-001", branchId: "br-main-001", wardId: "w1", wardName: "Cardiology ICU", wardType: "icu", bedNumber: "ICU-03", status: "cleaning", dailyRate: 4500 },
   { id: "b4", organizationId: "org-apex-001", branchId: "br-main-001", wardId: "w1", wardName: "Cardiology ICU", wardType: "icu", bedNumber: "ICU-04", status: "occupied", dailyRate: 4500, patientName: "Geeta Sharma" },
+  { id: "b13", organizationId: "org-apex-001", branchId: "br-main-001", wardId: "w4", wardName: "Coronary Care Unit (CCU)", wardType: "ccu", bedNumber: "CCU-01", status: "occupied", dailyRate: 4800, patientName: "Aakash Mehta" },
+  { id: "b14", organizationId: "org-apex-001", branchId: "br-main-001", wardId: "w4", wardName: "Coronary Care Unit (CCU)", wardType: "ccu", bedNumber: "CCU-02", status: "available", dailyRate: 4800 },
   { id: "b5", organizationId: "org-apex-001", branchId: "br-main-001", wardId: "w2", wardName: "General Male Ward", wardType: "general", bedNumber: "GMW-01", status: "occupied", dailyRate: 1200, patientName: "Sohan Lal" },
   { id: "b6", organizationId: "org-apex-001", branchId: "br-main-001", wardId: "w2", wardName: "General Male Ward", wardType: "general", bedNumber: "GMW-02", status: "available", dailyRate: 1200 },
   { id: "b7", organizationId: "org-apex-001", branchId: "br-main-001", wardId: "w2", wardName: "General Male Ward", wardType: "general", bedNumber: "GMW-03", status: "available", dailyRate: 1200 },
   { id: "b8", organizationId: "org-apex-001", branchId: "br-main-001", wardId: "w2", wardName: "General Male Ward", wardType: "general", bedNumber: "GMW-04", status: "occupied", dailyRate: 1200, patientName: "Mohan Jadhav" },
-  { id: "b9", organizationId: "org-apex-001", branchId: "br-main-001", wardId: "w3", wardName: "Private Deluxe", wardType: "private", bedNumber: "PVT-101", status: "occupied", dailyRate: 3500, patientName: "Neha Roy" },
-  { id: "b10", organizationId: "org-apex-001", branchId: "br-main-001", wardId: "w3", wardName: "Private Deluxe", wardType: "private", bedNumber: "PVT-102", status: "available", dailyRate: 3500 },
-  { id: "b11", organizationId: "org-apex-001", branchId: "br-main-001", wardId: "w3", wardName: "Private Deluxe", wardType: "private", bedNumber: "PVT-103", status: "available", dailyRate: 3500 },
-  { id: "b12", organizationId: "org-apex-001", branchId: "br-main-001", wardId: "w3", wardName: "Private Deluxe", wardType: "private", bedNumber: "PVT-104", status: "maintenance", dailyRate: 3500 },
+  { id: "b9", organizationId: "org-apex-001", branchId: "br-main-001", wardId: "w3", wardName: "Private Deluxe Suite", wardType: "deluxe", bedNumber: "DLX-101", status: "occupied", dailyRate: 3500, patientName: "Neha Roy" },
+  { id: "b10", organizationId: "org-apex-001", branchId: "br-main-001", wardId: "w3", wardName: "Private Deluxe Suite", wardType: "deluxe", bedNumber: "DLX-102", status: "available", dailyRate: 3500 },
+  { id: "b11", organizationId: "org-apex-001", branchId: "br-main-001", wardId: "w3", wardName: "Private Deluxe Suite", wardType: "deluxe", bedNumber: "DLX-103", status: "available", dailyRate: 3500 },
+  { id: "b12", organizationId: "org-apex-001", branchId: "br-main-001", wardId: "w3", wardName: "Private Deluxe Suite", wardType: "deluxe", bedNumber: "DLX-104", status: "maintenance", dailyRate: 3500 },
 ];
 
 const INITIAL_INVENTORY: InventoryItem[] = [
@@ -1064,7 +1771,12 @@ class ClinicalStore {
     return {
       patients: INITIAL_PATIENTS,
       appointments: INITIAL_APPOINTMENTS,
+      doctorBlocks: INITIAL_DOCTOR_BLOCKS,
+      doctorAvailabilities: INITIAL_DOCTOR_AVAILABILITIES,
       consultations: [],
+      patientAllergies: INITIAL_PATIENT_ALLERGIES,
+      clinicalAttachments: INITIAL_CLINICAL_ATTACHMENTS,
+      opdConsultations: INITIAL_OPD_CONSULTATIONS,
       beds: INITIAL_BEDS,
       admissions: [
         {
@@ -1199,6 +1911,100 @@ class ClinicalStore {
         a.id === appointmentId ? { ...a, status, updatedAt: new Date().toISOString() } : a
       ),
     };
+    this.persist();
+  }
+
+  public addDoctorBlock(block: DoctorBlock) {
+    this.state = {
+      ...this.state,
+      doctorBlocks: [block, ...this.state.doctorBlocks],
+    };
+    this.logAudit({
+      actor: "Reception Desk",
+      role: "Receptionist",
+      action: "BLOCK_DOCTOR_SCHEDULE",
+      module: "Appointments",
+      entity: block.id,
+      notes: `Blocked ${block.doctorName} on ${block.startDate} (${block.startTime || "Full Day"} - ${block.reason})`,
+    });
+    this.persist();
+  }
+
+  public removeDoctorBlock(id: string) {
+    this.state = {
+      ...this.state,
+      doctorBlocks: this.state.doctorBlocks.filter((b) => b.id !== id),
+    };
+    this.persist();
+  }
+
+  public updateDoctorAvailability(schedule: DoctorWeeklySchedule) {
+    this.state = {
+      ...this.state,
+      doctorAvailabilities: {
+        ...this.state.doctorAvailabilities,
+        [schedule.doctorId]: schedule,
+      },
+    };
+    this.logAudit({
+      actor: "Reception Desk",
+      role: "Receptionist",
+      action: "UPDATE_DOCTOR_AVAILABILITY",
+      module: "Appointments",
+      entity: schedule.doctorId,
+      notes: `Updated weekly schedule and ${schedule.slotDurationMinutes}m slot duration for ${schedule.doctorName}`,
+    });
+    this.persist();
+  }
+
+  public rescheduleAppointment(appointmentId: string, newDate: string, newTimeSlot: string) {
+    this.state = {
+      ...this.state,
+      appointments: this.state.appointments.map((a) =>
+        a.id === appointmentId
+          ? {
+              ...a,
+              appointmentDate: newDate,
+              timeSlot: newTimeSlot,
+              updatedAt: new Date().toISOString(),
+            }
+          : a
+      ),
+    };
+    this.logAudit({
+      actor: "Reception Desk",
+      role: "Receptionist",
+      action: "RESCHEDULE_APPOINTMENT",
+      module: "Appointments",
+      entity: appointmentId,
+      notes: `Rescheduled appointment to ${newDate} at ${newTimeSlot}`,
+    });
+    this.persist();
+  }
+
+  public cancelAppointment(appointmentId: string, reason?: string) {
+    this.state = {
+      ...this.state,
+      appointments: this.state.appointments.map((a) =>
+        a.id === appointmentId
+          ? {
+              ...a,
+              status: "cancelled",
+              notes: reason || a.notes,
+              cancellationReason: reason,
+              updatedAt: new Date().toISOString(),
+            }
+          : a
+      ),
+    };
+    this.logAudit({
+      actor: "Reception Desk",
+      role: "Receptionist",
+      action: "CANCEL_APPOINTMENT",
+      module: "Appointments",
+      entity: appointmentId,
+      notes: `Cancelled appointment: ${reason || "Patient request"}`,
+    });
     this.persist();
   }
 
@@ -1633,6 +2439,91 @@ class ClinicalStore {
       module: "Staff",
       entity: `${role}:${permission}`,
       notes: `Set ${permission} to ${value} for role ${role}`,
+    });
+    this.persist();
+  }
+
+  // --- OPD Consultation, Allergies & Clinical Attachments Actions ---
+  public addPatientAllergy(allergy: PatientAllergy) {
+    this.state = {
+      ...this.state,
+      patientAllergies: [...this.state.patientAllergies, allergy],
+    };
+    this.logAudit({
+      actor: "Dr. Rajeev Prasad",
+      role: "Doctor",
+      action: "ADD_PATIENT_ALLERGY",
+      module: "EMR",
+      entity: allergy.patientId,
+      notes: `Added ${allergy.allergyType} allergy: ${allergy.allergen} (${allergy.severity})`,
+    });
+    this.persist();
+  }
+
+  public removePatientAllergy(allergyId: string) {
+    this.state = {
+      ...this.state,
+      patientAllergies: this.state.patientAllergies.filter((a) => a.id !== allergyId),
+    };
+    this.persist();
+  }
+
+  public addClinicalAttachment(attachment: ClinicalAttachment) {
+    this.state = {
+      ...this.state,
+      clinicalAttachments: [...this.state.clinicalAttachments, attachment],
+    };
+    this.logAudit({
+      actor: "Clinical Assistant",
+      role: "Nurse",
+      action: "UPLOAD_CLINICAL_ATTACHMENT",
+      module: "EMR",
+      entity: attachment.id,
+      notes: `Attached ${attachment.fileName} (${attachment.category}) to appointment ${attachment.appointmentId}`,
+    });
+    this.persist();
+  }
+
+  public removeClinicalAttachment(attachmentId: string) {
+    this.state = {
+      ...this.state,
+      clinicalAttachments: this.state.clinicalAttachments.filter((a) => a.id !== attachmentId),
+    };
+    this.persist();
+  }
+
+  public saveConsultationDraft(record: OpdConsultationRecord) {
+    this.state = {
+      ...this.state,
+      opdConsultations: {
+        ...this.state.opdConsultations,
+        [record.appointmentId]: { ...record, isDraft: true, updatedAt: new Date().toISOString() },
+      },
+    };
+    this.persist();
+  }
+
+  public completeOpdConsultation(record: OpdConsultationRecord) {
+    const completedAt = new Date().toISOString();
+    this.state = {
+      ...this.state,
+      opdConsultations: {
+        ...this.state.opdConsultations,
+        [record.appointmentId]: { ...record, isDraft: false, completedAt, updatedAt: completedAt },
+      },
+      appointments: this.state.appointments.map((a) =>
+        a.id === record.appointmentId
+          ? { ...a, status: "completed", updatedAt: completedAt }
+          : a
+      ),
+    };
+    this.logAudit({
+      actor: record.doctorName,
+      role: "Doctor",
+      action: "COMPLETE_OPD_CONSULTATION",
+      module: "EMR",
+      entity: record.appointmentId,
+      notes: `Completed OPD consultation for appointment ${record.appointmentId} with ${record.prescriptions.length} Rx items and ${record.diagnoses.length} diagnoses`,
     });
     this.persist();
   }

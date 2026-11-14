@@ -110,10 +110,34 @@
   nav,
   .no-print,
   button:not(.allow-print),
+  [data-sidebar],
+  [data-topbar],
   [data-sonner-toaster],
   [data-sonner-toast] {
     display: none !important;
     visibility: hidden !important;
+  }
+
+  /* When printing a document from an open dialog modal, hide background app shell */
+  body:has([role="dialog"]) main,
+  body:has([role="dialog"]) [data-sidebar],
+  body:has([role="dialog"]) [data-topbar] {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  /* Unconstrain dialog modal viewport for multi-page A4 and 80mm thermal slips */
+  div[role="dialog"] {
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: transparent !important;
+    transform: none !important;
   }
 
   .flex.h-screen.overflow-hidden,

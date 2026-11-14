@@ -155,7 +155,7 @@ export class BillingService {
     lines.push(`Paid         : ${formatCurrencyINR(invoice.amountPaid)}`);
     lines.push(`Balance Due  : ${formatCurrencyINR(invoice.balanceDue)}`);
     lines.push(divider);
-    lines.push("Mode: " + invoice.paymentMode.toUpperCase());
+    lines.push("Mode: " + (invoice.paymentMode || "cash").toUpperCase());
     lines.push("      Get Well Soon! Thank You!       ");
     lines.push(divider);
 

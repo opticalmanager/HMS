@@ -39,6 +39,40 @@ export type AppointmentStatus =
   | "no_show";
 
 export type AppointmentPriority = "normal" | "urgent" | "emergency";
+export type AppointmentSource = "sys" | "walk_in" | "online" | "abha";
+export type AppointmentType = "new" | "follow_up";
+export type CalendarViewType = "matrix" | "day" | "week" | "month";
+
+export interface DoctorBlock {
+  id: string;
+  doctorId: string; // or "all"
+  doctorName: string;
+  startDate: string; // YYYY-MM-DD
+  endDate: string;
+  startTime?: string; // HH:mm
+  endTime?: string;
+  blockType?: "lunch" | "ot_surgery" | "meeting" | "ward_duty" | "leave" | "break" | "ot" | "other" | string;
+  reason: string;
+  notes?: string;
+  createdAt: string;
+}
+
+export interface DoctorWeeklySchedule {
+  doctorId: string;
+  doctorName: string;
+  department: string;
+  slotDurationMinutes: number; // 5, 10, 15, 20, 30, 45, 60
+  days: {
+    [dayOfWeek: number]: { // 0 = Sunday, 1 = Monday ...
+      isActive: boolean;
+      morningStart: string; // "09:00"
+      morningEnd: string;   // "13:00"
+      eveningStart: string; // "16:00"
+      eveningEnd: string;   // "20:00"
+    };
+  };
+  maxOverbookingSlots: number;
+}
 
 export interface Appointment {
   id: string;
@@ -56,9 +90,13 @@ export interface Appointment {
   timeSlot: string; // HH:mm
   status: AppointmentStatus;
   priority: AppointmentPriority;
+  source?: AppointmentSource;
+  appointmentType?: AppointmentType;
   chiefComplaints?: string;
   consultationFee: number;
   isPaid: boolean;
+  notes?: string;
+  cancellationReason?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -119,7 +157,7 @@ export interface OpdConsultation {
 }
 
 export type BedStatus = "available" | "occupied" | "cleaning" | "maintenance" | "reserved";
-export type WardType = "general" | "semi_private" | "private" | "icu" | "nicu" | "emergency";
+export type WardType = "general" | "semi_private" | "private" | "deluxe" | "icu" | "ccu" | "nicu" | "emergency";
 
 export interface Bed {
   id: string;
@@ -217,4 +255,77 @@ export interface InventoryItem {
   gstRate: number;
   manufacturer?: string;
   rackLocation?: string;
+}
+
+// OPD Consultation & Clinical Extensions
+export type AllergyType = "drug" | "food" | "environmental" | "contact";
+export type AllergySeverity = "mild" | "moderate" | "severe";
+
+export interface PatientAllergy {
+  id: string;
+  patientId: string;
+  allergyType: AllergyType;
+  allergen: string;
+  severity: AllergySeverity;
+  reaction: string;
+  onsetDate?: string;
+  createdAt: string;
+}
+
+export type AttachmentCategory = "lab" | "radiology" | "prescription" | "clinical_photo" | "other";
+
+export interface ClinicalAttachment {
+  id: string;
+  appointmentId: string;
+  patientId: string;
+  fileName: string;
+  fileSize: number; // in bytes
+  fileType: string; // e.g. "image/png", "application/pdf"
+  fileUrl: string;
+  category: AttachmentCategory;
+  uploadedAt: string;
+  notes?: string;
+}
+
+export interface LabInvestigationOrder {
+  id: string;
+  testName: string;
+  category: "pathology" | "biochemistry" | "hematology" | "radiology" | "ocular" | "other";
+  instructions?: string;
+  status: "ordered" | "sample_collected" | "processing" | "reported";
+  orderedAt: string;
+}
+
+export type OpdConsultationTab =
+  | "symptoms"
+  | "vitals"
+  | "diagnosis"
+  | "rx"
+  | "investigations"
+  | "advice"
+  | "followup"
+  | "notes";
+
+export interface OpdConsultationRecord {
+  id: string;
+  appointmentId: string;
+  patientId: string;
+  doctorId: string;
+  doctorName: string;
+  consultationDate: string;
+  chiefComplaints: string;
+  symptomsDuration?: string;
+  clinicalHistoryChips: string[];
+  vitals: VitalRecord;
+  diagnoses: DiagnosisEntry[];
+  prescriptions: PrescriptionItem[];
+  investigations: LabInvestigationOrder[];
+  clinicalAdvice: string[];
+  followUpDays?: number;
+  followUpDate?: string;
+  doctorNotes?: string;
+  isDraft: boolean;
+  completedAt?: string;
+  createdAt: string;
+  updatedAt: string;
 }

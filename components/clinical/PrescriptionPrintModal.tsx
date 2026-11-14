@@ -43,7 +43,7 @@ export function PrescriptionPrintModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto p-0">
-        <DialogHeader className="p-4 border-b border-slate-200 bg-slate-50 flex flex-row items-center justify-between">
+        <DialogHeader className="p-4 border-b border-slate-200 bg-slate-50 flex flex-row items-center justify-between print:hidden">
           <DialogTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
             <Printer className="h-4 w-4 text-[#2563EB]" />
             A4 Digital Clinical Letterhead Print Preview

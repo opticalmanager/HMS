@@ -23,6 +23,8 @@ interface AppointmentBookingModalProps {
   onOpenChange: (open: boolean) => void;
   onBookSuccess?: (appointment: Appointment) => void;
   isQuickWalkIn?: boolean;
+  initialPatient?: Patient | null;
+  initialDate?: string;
 }
 
 const DOCTORS = [
@@ -47,25 +49,47 @@ export function AppointmentBookingModal({
   onOpenChange,
   onBookSuccess,
   isQuickWalkIn = false,
+  initialPatient = null,
+  initialDate,
 }: AppointmentBookingModalProps) {
   const store = useClinicalStore();
 
   const [searchPatient, setSearchPatient] = React.useState("");
-  const [selectedPatient, setSelectedPatient] = React.useState<Patient | null>(null);
+  const [selectedPatient, setSelectedPatient] = React.useState<Patient | null>(initialPatient);
 
   const [formData, setFormData] = React.useState({
-    fullName: "",
-    phone: "",
-    uhid: "",
+    fullName: initialPatient?.fullName || "",
+    phone: initialPatient?.phone || "",
+    uhid: initialPatient?.uhid || "",
     doctorId: DOCTORS[0].id,
     doctorName: DOCTORS[0].name,
     department: DOCTORS[0].dept,
-    appointmentDate: new Date().toISOString().split("T")[0],
+    appointmentDate: initialDate || new Date().toISOString().split("T")[0],
     timeSlot: "10:00 AM",
     priority: "normal" as "normal" | "urgent" | "emergency",
     chiefComplaints: "General consultation and health review",
     fee: DOCTORS[0].fee,
   });
+
+  React.useEffect(() => {
+    if (open) {
+      if (initialPatient) {
+        setSelectedPatient(initialPatient);
+        setFormData((prev) => ({
+          ...prev,
+          fullName: initialPatient.fullName,
+          phone: initialPatient.phone,
+          uhid: initialPatient.uhid,
+          appointmentDate: initialDate || prev.appointmentDate,
+        }));
+      } else if (initialDate) {
+        setFormData((prev) => ({
+          ...prev,
+          appointmentDate: initialDate,
+        }));
+      }
+    }
+  }, [open, initialPatient, initialDate]);
 
   // Autocomplete patient suggestions
   const patientSuggestions = React.useMemo(() => {

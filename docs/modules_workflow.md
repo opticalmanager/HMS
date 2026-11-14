@@ -64,16 +64,16 @@ The hospital monolith coordinates patient care through a seamless multi-departme
 
 ### Step 5: IPD Admission, Bed Matrix & Nursing MAR
 1. If patient requires admission, staff opens the live Bed Matrix (`/ipd`).
-2. Admitting nurse selects an available bed (ICU, Private Deluxe, General Ward) and allocates it with admission diagnosis, primary consultant, and advance deposit.
+2. Admitting nurse selects an available bed across specialized wards: ICU (Intensive Care), CCU (Coronary Care), General Ward, or Deluxe Suite, and allocates it with admission diagnosis, primary consultant, and advance deposit.
 3. Nursing Medication Administration Record (MAR) shift checklist tracks Morning (08:00), Afternoon (14:00), Evening (20:00), and Night (02:00) medication rounds with 1-click nurse sign-off.
 4. Length of stay and room tariffs are calculated continuously.
 
 ### Step 6: Discharge Summary & Billing Settlement
 1. Attending clinician generates the official Discharge Summary (provisional diagnosis, hospital course, discharge medications, follow-up advice).
-2. Accountant reviews invoice, advance deposits, and discounts.
+2. Accountant reviews invoice, selects any registered patient via autocomplete or enters walk-in details, and can quick-populate charges from the Hospital Service Catalog.
 3. Indian GST tax engine automatically calculates CGST + SGST (intra-state) or IGST (inter-state).
 4. Invoice is settled via Cash, UPI (with dynamic QR code), Card, or Insurance.
-5. 80mm ESC/POS thermal receipt or A4 itemized invoice is printed.
+5. 80mm ESC/POS thermal receipt or A4 itemized invoice is printed with strict chrome isolation.
 6. Cashier shift drawer reconciliation balances opening float, collections, safe drops, and closing cash counts.
 
 ### Step 7: 16 Clinical & Financial Management Reports

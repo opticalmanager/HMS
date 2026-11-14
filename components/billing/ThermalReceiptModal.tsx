@@ -47,8 +47,8 @@ export function ThermalReceiptModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md p-0 overflow-hidden">
-        <DialogHeader className="p-4 border-b border-slate-200 bg-slate-50 flex flex-row items-center justify-between">
+      <DialogContent className="max-w-md p-0 overflow-hidden print:max-w-none print:w-auto print:border-none print:shadow-none print:p-0">
+        <DialogHeader className="p-4 border-b border-slate-200 bg-slate-50 flex flex-row items-center justify-between print:hidden">
           <DialogTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
             <Printer className="h-4 w-4 text-[#2563EB]" />
             80mm ESC/POS Thermal Receipt Preview

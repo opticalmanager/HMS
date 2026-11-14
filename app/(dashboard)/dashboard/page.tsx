@@ -125,6 +125,16 @@ export default function DashboardPage() {
     },
   ];
 
+  const displayedAppointments = React.useMemo(() => {
+    if (selectedKpi === "opd") {
+      return store.appointments.filter((a) => a.status === "in_consultation");
+    }
+    if (selectedKpi === "appointments") {
+      return store.appointments;
+    }
+    return store.appointments;
+  }, [selectedKpi, store.appointments]);
+
   return (
     <div className="space-y-6">
       {/* Top Header & Quick Action Row */}
@@ -340,32 +350,38 @@ export default function DashboardPage() {
                 </Table>
               ) : (
                 <div className="divide-y divide-slate-100">
-                  {store.appointments.map((item) => (
-                    <div key={item.id} className="p-3.5 flex items-center justify-between hover:bg-slate-50 transition-colors">
-                      <div className="flex items-center gap-3">
-                        <div className="h-9 w-9 rounded-lg bg-blue-50 text-[#2563EB] flex items-center justify-center font-mono font-bold text-sm">
-                          #{item.tokenNumber}
-                        </div>
-                        <div>
-                          <div className="text-xs font-semibold text-slate-900">{item.patientName}</div>
-                          <div className="text-[11px] text-slate-500 font-mono">
-                            {item.patientUhid} • {item.doctorName} ({item.department})
+                  {displayedAppointments.length === 0 ? (
+                    <div className="p-6 text-center text-xs text-slate-400">
+                      No patient appointments matching active filter.
+                    </div>
+                  ) : (
+                    displayedAppointments.map((item) => (
+                      <div key={item.id} className="p-3.5 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                        <div className="flex items-center gap-3">
+                          <div className="h-9 w-9 rounded-lg bg-blue-50 text-[#2563EB] flex items-center justify-center font-mono font-bold text-sm">
+                            #{item.tokenNumber}
+                          </div>
+                          <div>
+                            <div className="text-xs font-semibold text-slate-900">{item.patientName}</div>
+                            <div className="text-[11px] text-slate-500 font-mono">
+                              {item.patientUhid} • {item.doctorName} ({item.department})
+                            </div>
                           </div>
                         </div>
+                        <div className="flex items-center gap-2.5">
+                          <Badge variant={item.priority === "emergency" ? "danger" : item.priority === "urgent" ? "warning" : "outline"}>
+                            {item.priority}
+                          </Badge>
+                          <Badge variant={item.status === "in_consultation" ? "info" : item.status === "completed" ? "success" : "outline"}>
+                            {item.status}
+                          </Badge>
+                          <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
+                            <Clock className="h-3.5 w-3.5 text-slate-400" /> {item.timeSlot}
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2.5">
-                        <Badge variant={item.priority === "emergency" ? "danger" : item.priority === "urgent" ? "warning" : "outline"}>
-                          {item.priority}
-                        </Badge>
-                        <Badge variant={item.status === "in_consultation" ? "info" : item.status === "completed" ? "success" : "outline"}>
-                          {item.status}
-                        </Badge>
-                        <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
-                          <Clock className="h-3.5 w-3.5 text-slate-400" /> {item.timeSlot}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               )}
             </CardContent>

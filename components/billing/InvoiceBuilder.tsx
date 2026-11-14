@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Trash2, Printer, CheckCircle, QrCode, CreditCard, Banknote, ShieldAlert, Sparkles } from "lucide-react";
+import { Plus, Trash2, Printer, CheckCircle, QrCode, CreditCard, Banknote, ShieldAlert, Sparkles, Search, UserCheck } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -26,6 +26,31 @@ export function InvoiceBuilder({
   onInvoiceCreated,
 }: InvoiceBuilderProps) {
   const store = useClinicalStore();
+
+  const [currentPatientName, setCurrentPatientName] = React.useState(patientName);
+  const [currentPatientPhone, setCurrentPatientPhone] = React.useState(patientPhone);
+  const [currentUhid, setCurrentUhid] = React.useState(uhid);
+  const [patientSearch, setPatientSearch] = React.useState("");
+  const [showPatientSearch, setShowPatientSearch] = React.useState(false);
+
+  const patientSuggestions = React.useMemo(() => {
+    if (!patientSearch.trim()) return [];
+    const clean = patientSearch.toLowerCase();
+    return store.patients.filter(
+      (p) =>
+        p.fullName.toLowerCase().includes(clean) ||
+        p.phone.includes(clean) ||
+        p.uhid.toLowerCase().includes(clean)
+    );
+  }, [patientSearch, store.patients]);
+
+  const selectPatient = (p: typeof store.patients[0]) => {
+    setCurrentPatientName(p.fullName);
+    setCurrentPatientPhone(p.phone);
+    setCurrentUhid(p.uhid);
+    setPatientSearch("");
+    setShowPatientSearch(false);
+  };
 
   const [items, setItems] = React.useState<InvoiceItem[]>([
     {
@@ -54,6 +79,21 @@ export function InvoiceBuilder({
     gstRate: 0,
     amount: 0,
   });
+
+  const handleSelectServiceFromCatalog = (serviceId: string) => {
+    const srv = store.settings.serviceCatalog.find((s) => s.id === serviceId);
+    if (srv) {
+      const cat = (srv.category === "bed" ? "room_rent" : srv.category) as any;
+      setNewItem({
+        description: srv.name,
+        category: cat,
+        quantity: 1,
+        unitPrice: srv.standardRate,
+        gstRate: srv.gstRate,
+        amount: srv.standardRate * (1 + srv.gstRate / 100),
+      });
+    }
+  };
 
   // State code for GST (Hospital is 27 Maharashtra)
   const [patientStateCode, setPatientStateCode] = React.useState<string>("27");
@@ -136,8 +176,8 @@ export function InvoiceBuilder({
       organizationId: "org-apex-001",
       branchId: "br-main-001",
       patientId: "pat-1",
-      patientName,
-      patientPhone,
+      patientName: currentPatientName,
+      patientPhone: currentPatientPhone,
       invoiceType: "opd",
       items,
       subtotal: totals.subtotal,
@@ -163,16 +203,64 @@ export function InvoiceBuilder({
 
   return (
     <div className="space-y-6">
-      {/* Patient Header */}
+      {/* Patient Header with Autocomplete Switcher */}
       <div className="p-4 rounded-xl border border-slate-200 bg-white flex flex-wrap items-center justify-between gap-4 shadow-xs">
-        <div>
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-            Billed Patient Details
-          </span>
-          <div className="text-base font-bold text-slate-900">{patientName}</div>
-          <div className="text-xs text-slate-500 font-mono">
-            UHID: {uhid} | Mobile: {patientPhone}
+        <div className="flex-1 min-w-[280px]">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+              Billed Patient Details
+            </span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowPatientSearch(!showPatientSearch)}
+              className="h-6 text-[11px] text-blue-600 hover:text-blue-800 p-0"
+            >
+              {showPatientSearch ? "Cancel Change" : "Change Patient"}
+            </Button>
           </div>
+
+          {showPatientSearch ? (
+            <div className="relative mt-2">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-slate-400" />
+                <Input
+                  value={patientSearch}
+                  onChange={(e) => setPatientSearch(e.target.value)}
+                  placeholder="Search patient name, phone, or UHID..."
+                  className="pl-8 h-8 text-xs bg-slate-50"
+                  autoFocus
+                />
+              </div>
+
+              {patientSuggestions.length > 0 && (
+                <div className="absolute top-full left-0 right-0 z-30 mt-1 max-h-48 overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg p-1 divide-y divide-slate-100">
+                  {patientSuggestions.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => selectPatient(p)}
+                      className="w-full p-2 text-left hover:bg-blue-50 rounded flex items-center justify-between text-xs"
+                    >
+                      <div>
+                        <span className="font-semibold text-slate-900">{p.fullName}</span>
+                        <span className="text-slate-400 ml-2 font-mono">({p.uhid})</span>
+                      </div>
+                      <span className="font-mono text-slate-600">{p.phone}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="mt-1">
+              <div className="text-base font-bold text-slate-900">{currentPatientName}</div>
+              <div className="text-xs text-slate-500 font-mono">
+                UHID: {currentUhid} | Mobile: {currentPatientPhone}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-3">
@@ -207,6 +295,33 @@ export function InvoiceBuilder({
             <Printer className="h-3.5 w-3.5 text-slate-600" /> 80mm Thermal POS Slip
           </Button>
         </div>
+      </div>
+
+      {/* Service Catalog Quick Selector Bar */}
+      <div className="p-3 rounded-xl border border-slate-200 bg-slate-50 flex flex-wrap items-center justify-between gap-2">
+        <div className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+          <Sparkles className="h-3.5 w-3.5 text-[#2563EB]" />
+          <span>Hospital Service Catalog Quick Fill:</span>
+        </div>
+        <select
+          onChange={(e) => {
+            if (e.target.value) {
+              handleSelectServiceFromCatalog(e.target.value);
+              e.target.value = "";
+            }
+          }}
+          defaultValue=""
+          className="h-8 rounded-md border border-slate-200 bg-white px-2.5 text-xs text-slate-800 font-medium"
+        >
+          <option value="" disabled>
+            + Pick service from catalog...
+          </option>
+          {store.settings.serviceCatalog.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name} ({s.category}) — {formatCurrencyINR(s.standardRate)} (GST: {s.gstRate}%)
+            </option>
+          ))}
+        </select>
       </div>
 
       {/* Add Line Item Row */}

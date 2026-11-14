@@ -16,6 +16,8 @@ import {
   Settings,
   Users2,
   Activity,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -34,25 +36,58 @@ const NAV_ITEMS = [
   { label: "System Settings", href: "/settings", icon: Settings },
 ];
 
-export function AppSidebar() {
+interface AppSidebarProps {
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
+}
+
+export function AppSidebar({ collapsed = false, onToggleCollapse }: AppSidebarProps) {
   const pathname = usePathname();
 
   return (
-    <aside className="w-64 border-r border-slate-200 bg-white flex flex-col shrink-0 min-h-screen">
-      <div className="h-16 flex items-center gap-3 px-6 border-b border-slate-200">
-        <div className="h-9 w-9 rounded-lg bg-[#2563EB] flex items-center justify-center text-white shadow-xs">
-          <Activity className="h-5 w-5" />
-        </div>
-        <div>
-          <span className="font-bold text-slate-900 leading-none block text-base">Apex HMS</span>
-          <span className="text-[11px] font-medium text-slate-500 block mt-0.5">Clinical EMR Monolith</span>
-        </div>
+    <aside
+      className={cn(
+        "border-r border-slate-200 bg-white flex flex-col shrink-0 min-h-screen transition-all duration-200 print:hidden select-none",
+        collapsed ? "w-16" : "w-64"
+      )}
+      data-sidebar
+    >
+      <div
+        className={cn(
+          "h-14 flex items-center border-b border-slate-200 px-3",
+          collapsed ? "justify-center" : "justify-between"
+        )}
+      >
+        <Link href="/dashboard" className="flex items-center gap-2.5 overflow-hidden">
+          <div className="h-8 w-8 rounded-lg bg-[#2563EB] flex items-center justify-center text-white shadow-xs shrink-0">
+            <Activity className="h-4 w-4" />
+          </div>
+          {!collapsed && (
+            <div className="min-w-0">
+              <span className="font-bold text-slate-900 leading-none block text-sm">Apex HMS</span>
+              <span className="text-[10px] font-medium text-slate-500 block mt-0.5 truncate">
+                Clinical Monolith
+              </span>
+            </div>
+          )}
+        </Link>
+        {onToggleCollapse && !collapsed && (
+          <button
+            onClick={onToggleCollapse}
+            className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+            title="Collapse sidebar (maximize workspace)"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
-      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-          Clinical Modules (12)
-        </div>
+      <nav className="flex-1 px-2 py-3 space-y-1 overflow-y-auto">
+        {!collapsed && (
+          <div className="px-2 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            Modules (12)
+          </div>
+        )}
         {NAV_ITEMS.map((item) => {
           const isActive = pathname === item.href || pathname?.startsWith(`${item.href}/`);
           const Icon = item.icon;
@@ -60,27 +95,39 @@ export function AppSidebar() {
             <Link
               key={item.href}
               href={item.href}
+              title={collapsed ? item.label : undefined}
               className={cn(
-                "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                "flex items-center rounded-md text-xs font-medium transition-colors cursor-pointer",
+                collapsed ? "justify-center p-2.5" : "gap-2.5 px-2.5 py-1.5",
                 isActive
-                  ? "bg-[#2563EB] text-white shadow-sm font-semibold"
+                  ? "bg-[#2563EB] text-white shadow-xs font-semibold"
                   : "text-slate-700 hover:bg-slate-100 hover:text-slate-900"
               )}
             >
               <Icon className={cn("h-4 w-4 shrink-0", isActive ? "text-white" : "text-slate-500")} />
-              <span>{item.label}</span>
+              {!collapsed && <span className="truncate">{item.label}</span>}
             </Link>
           );
         })}
       </nav>
 
-      <div className="p-4 border-t border-slate-200 bg-slate-50">
-        <div className="flex items-center justify-between text-xs text-slate-500">
-          <span>ABDM FHIR R4</span>
-          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800">
-            M1 & M2 Active
-          </span>
-        </div>
+      <div className="p-2 border-t border-slate-200 bg-slate-50/70 flex items-center justify-between">
+        {collapsed ? (
+          <button
+            onClick={onToggleCollapse}
+            className="w-full py-1.5 flex items-center justify-center text-slate-500 hover:text-slate-800 hover:bg-slate-200/50 rounded transition-colors cursor-pointer"
+            title="Expand sidebar"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        ) : (
+          <div className="w-full flex items-center justify-between text-[11px] text-slate-500 px-1">
+            <span>ABDM FHIR R4</span>
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800">
+              M1 & M2 Active
+            </span>
+          </div>
+        )}
       </div>
     </aside>
   );

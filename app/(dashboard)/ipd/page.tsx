@@ -147,17 +147,23 @@ export default function IpdPage() {
         {/* Tab 1: Visual Bed Matrix */}
         <TabsContent value="matrix" className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            {/* Ward Filter Buttons */}
+            {/* Ward Filter Buttons: ICU, CCU, General Ward, Deluxe */}
             <div className="flex flex-wrap items-center gap-2">
-              {["all", "icu", "general", "private"].map((w) => (
+              {[
+                { id: "all", label: "All Wards" },
+                { id: "icu", label: "ICU" },
+                { id: "ccu", label: "CCU" },
+                { id: "general", label: "General Ward" },
+                { id: "deluxe", label: "Deluxe Suite" },
+              ].map((w) => (
                 <Button
-                  key={w}
+                  key={w.id}
                   size="sm"
-                  variant={selectedWard === w ? "default" : "outline"}
-                  onClick={() => setSelectedWard(w)}
-                  className="capitalize text-xs h-8"
+                  variant={selectedWard === w.id ? "default" : "outline"}
+                  onClick={() => setSelectedWard(w.id)}
+                  className="text-xs h-8"
                 >
-                  {w === "all" ? "All Wards" : `${w.replace("_", " ")} Ward`}
+                  {w.label}
                 </Button>
               ))}
             </div>

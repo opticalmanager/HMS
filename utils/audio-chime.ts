@@ -38,7 +38,7 @@ class AudioChimeService {
    * Plays a 2-tone melodic chime: Note 1 (880Hz / A5) followed by Note 2 (587.33Hz / D5)
    */
   public playChime(volume: number = 0.5): Promise<void> {
-    if (this.isMuted) return Promise.resolve();
+    if (this.isMuted || volume <= 0) return Promise.resolve();
 
     return new Promise((resolve) => {
       const ctx = this.getContext();
@@ -48,6 +48,7 @@ class AudioChimeService {
       }
 
       try {
+        const safeVolume = Math.min(1, Math.max(0.001, volume));
         const now = ctx.currentTime;
 
         // Tone 1: High Bell Note (880Hz)
@@ -56,9 +57,9 @@ class AudioChimeService {
         osc1.type = "sine";
         osc1.frequency.setValueAtTime(880, now); // A5
 
-        gain1.gain.setValueAtTime(0.001, now);
-        gain1.gain.exponentialRampToValueAtTime(volume * 0.8, now + 0.05);
-        gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+        gain1.gain.setValueAtTime(0.0001, now);
+        gain1.gain.exponentialRampToValueAtTime(Math.max(0.0001, safeVolume * 0.8), now + 0.05);
+        gain1.gain.exponentialRampToValueAtTime(0.0001, now + 0.55);
 
         osc1.connect(gain1);
         gain1.connect(ctx.destination);
@@ -72,8 +73,8 @@ class AudioChimeService {
         osc2.type = "sine";
         osc2.frequency.setValueAtTime(587.33, now + 0.28); // D5
 
-        gain2.gain.setValueAtTime(0.001, now + 0.28);
-        gain2.gain.exponentialRampToValueAtTime(volume, now + 0.33);
+        gain2.gain.setValueAtTime(0.0001, now + 0.28);
+        gain2.gain.exponentialRampToValueAtTime(Math.max(0.0001, safeVolume), now + 0.33);
         gain2.gain.exponentialRampToValueAtTime(0.0001, now + 1.2);
 
         osc2.connect(gain2);

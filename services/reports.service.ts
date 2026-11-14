@@ -357,12 +357,12 @@ export class ReportsService {
       }
 
       case "rep-bed-alos": {
-        const wards = ["Cardiology ICU", "General Male Ward", "Private Deluxe"];
+        const wards = Array.from(new Set(state.beds.map((b) => b.wardName)));
         const rows = wards.map((w) => {
           const wardBeds = state.beds.filter((b) => b.wardName === w);
           const occupied = wardBeds.filter((b) => b.status === "occupied").length;
           const rate = wardBeds.length > 0 ? ((occupied / wardBeds.length) * 100).toFixed(1) + "%" : "0%";
-          const alos = w.includes("ICU") ? "3.2" : w.includes("General") ? "4.1" : "2.8";
+          const alos = w.includes("ICU") ? "3.2" : w.includes("CCU") ? "2.5" : w.includes("General") ? "4.1" : "2.8";
           return {
             ward: w,
             totalBeds: wardBeds.length,
