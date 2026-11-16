@@ -76,23 +76,29 @@ The hospital monolith coordinates patient care through a seamless multi-departme
 5. 80mm ESC/POS thermal receipt or A4 itemized invoice is printed with strict chrome isolation.
 6. Cashier shift drawer reconciliation balances opening float, collections, safe drops, and closing cash counts.
 
-### Step 7: 16 Clinical & Financial Management Reports
-Hospital administrators and department heads access 16 operational reports in `/reports`:
-1. Doctor Revenue Share Report
-2. Cashier Shift Collections Register
-3. GSTR-1 Outward Supplies Report
-4. GSTR-3B Tax Summary
-5. Bed Occupancy & ALOS Report
-6. OPD Daily Footfall & Census
-7. Pharmacy Dispense & Profit Margins
-8. IPD Discharge & Mortality Register
-9. Inventory Near-Expiry Stock Valuation
-10. Department-wise Revenue Breakdown
-11. Outstanding / Due Payments Ledger
-12. Lab Diagnostic Test Utilization
-13. Patient Demographics & Geography
-14. Referral Doctor Incentives Report
-15. Discount & Concession Audit Report
-16. Procedure & OT Utilization Report
+### Step 7: 16 Healthray Clinical & Financial Management Categories & Sub-Reports
+Hospital administrators, accountants, and clinical heads access 16 operational report categories with dedicated sub-tabs in `/reports`:
+1. **Bill / Receipt Report**: Bills, Bill Item Wise, Bill Receipt, Group Wise, Item Wise Tax, Doctor Share, Discount, Procedure, Operator Wise, Emergency Bills
+2. **Collection Reports**: Total Collection (with formula summary: Current Period + Past Bill Collections = Net Collection), Operator Wise, Department Wise, Refund Report, Daily Cashier Shift Summary, Hospital Status
+3. **Revenue Sharing**: Treating Doctor Share (40/60 split), Department Payout Split
+4. **Referral Reports**: Doctor & Agent Referrals, Diagnostic Referrals
+5. **Patient Report**: Ledger Report, Patient Directory with ABHA, Patient Due / Deposit
+6. **Rx Report**: Drug Dispense & Prescription Frequency, Near-Expiry Stock Valuation
+7. **Consultation Report**: OPD Daily Footfall, Speciality-wise Census, Wait Times
+8. **Hospital Expenses**: Operational & Petty Cash Register, Vendor Purchase Register
+9. **Custom Report**: Custom MIS Queries, Department Summary
+10. **OPD Tracking**: Patient Turnaround & Queue Timers, Hourly Footfall Tracker
+11. **Patient Deposit & Refund**: Advance Deposits, Reversals & Refunds
+12. **Statutory GST Reports**: GSTR-1 Outward Supplies, GSTR-3B Tax Summary
+13. **TAT Reports**: Turnaround Time (Registration to Consultation), Diagnostic Lab TAT
+14. **Download History**: Export Audit Log, User Access Log
+15. **Revenue Leakage Reports**: Concessions, Waivers & Discounts Audit, Cancelled Invoices Register
+16. **OTP & ABDM Authorization**: ABHA Milestone Linkage (M1 KYC & M2 Care Context), Consent & Auth Logs
 
-All reports support instant date-range filtering, in-memory aggregation, and one-click export to CSV / Excel.
+#### UI/UX Architecture & Ergonomics:
+- **Left Collapsible Category Drawer (`w-56` / 224px)**: Real-time search filtering, active category badge counts, and `<` / `>` toggle button for maximizing tabular workspace.
+- **Horizontal Sub-Tabs Ribbon**: Instant tab-switching across sub-reports with zero latency.
+- **Multi-Field Filter Ribbon**: Duration selector (Today, Yesterday, Last 7/30 Days, This Month, Custom), Start/End date and time inputs, Doctor & Department selectors, Payment Mode filter, UHID/Patient search, OPD/IPD encounter radio buttons, and Due/Cancelled/Settled checkboxes.
+- **Top KPI Statistical Summary Cards**: Formatted in Indian Lakh/Crore (`₹`), mint green badge card (`#e8f5e9`) for Total Paid, soft coral card (`#ffebee`) for Total Due, and math formula cards for Collections.
+- **Enterprise High-Density Data Table**: Sticky headers and sticky left columns (`No.`, `UHID`, `Patient Name`, `Bill #`), status badges, and bottom Grand Total sums row.
+- **Reports Export Engine**: One-click Excel/CSV export (`exportToCsv` with UTF-8 BOM) and official A4 Print Preview with hospital headers.

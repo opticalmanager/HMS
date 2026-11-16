@@ -2,219 +2,303 @@
 
 import * as React from "react";
 import {
-  BarChart3,
-  Download,
-  TrendingUp,
   FileSpreadsheet,
-  Filter,
-  Calendar,
-  Search,
-  CheckCircle2,
+  Download,
+  Printer,
+  ChevronRight,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { useClinicalStore } from "@/services/clinical-store";
-import { ReportsService, REPORTS_CATALOG, type ReportDataResult } from "@/services/reports.service";
+import {
+  ReportsService,
+  HEALTHRAY_REPORT_CATEGORIES,
+  type HealthrayCategory,
+  type ReportFilterOptions,
+  type ReportDataResult,
+} from "@/services/reports.service";
+import { ReportsCategoryDrawer } from "@/components/reports/ReportsCategoryDrawer";
+import { ReportsFilterRibbon } from "@/components/reports/ReportsFilterRibbon";
+import { ReportsKpiSummaryCards } from "@/components/reports/ReportsKpiSummaryCards";
+import { ReportsDataTable } from "@/components/reports/ReportsDataTable";
+import { ReportsPagination } from "@/components/reports/ReportsPagination";
+import { ReportsPrintModal } from "@/components/reports/ReportsPrintModal";
 import { exportToCsv } from "@/utils/csv-export";
 
 export default function ReportsPage() {
   const store = useClinicalStore();
-  const [selectedReportId, setSelectedReportId] = React.useState<string>("rep-doc-share");
-  const [categoryFilter, setCategoryFilter] = React.useState<string>("all");
-  const [searchQuery, setSearchQuery] = React.useState<string>("");
-  const [dateRange, setDateRange] = React.useState<string>("mtd"); // Month-to-date
 
-  const reportData: ReportDataResult = React.useMemo(() => {
-    return ReportsService.generateReport(selectedReportId, store);
-  }, [selectedReportId, store]);
-
-  const filteredCatalog = REPORTS_CATALOG.filter(
-    (r) => categoryFilter === "all" || r.category === categoryFilter
+  // Active Category & Sub-tab State
+  const [activeCategory, setActiveCategory] = React.useState<HealthrayCategory>(
+    HEALTHRAY_REPORT_CATEGORIES[0]
   );
+  const [activeSubTabId, setActiveSubTabId] = React.useState<string>(
+    HEALTHRAY_REPORT_CATEGORIES[0].subTabs[0].id
+  );
+  const [drawerCollapsed, setDrawerCollapsed] = React.useState<boolean>(false);
 
-  const handleExportCsv = () => {
-    const columns = reportData.meta.columns.map((col) => ({
-      header: col.header,
-      accessor: col.key,
-    }));
-    exportToCsv(reportData.meta.id, columns, reportData.rows);
-  };
-
-  const filteredRows = reportData.rows.filter((row) => {
-    if (!searchQuery.trim()) return true;
-    const clean = searchQuery.toLowerCase();
-    return Object.values(row).some((val) => String(val).toLowerCase().includes(clean));
+  // Multi-Field Filter State
+  const [filters, setFilters] = React.useState<ReportFilterOptions>({
+    duration: "month",
+    startDate: "2026-11-01",
+    endDate: "2026-11-30",
+    startTime: "00:00",
+    endTime: "23:59",
+    doctorId: "all",
+    department: "all",
+    paymentMode: "all",
+    searchQuery: "",
+    encounterType: "all",
+    dueOnly: false,
+    cancelled: false,
+    settled: false,
   });
 
+  // Applied Filter State (triggers re-computation on "Apply")
+  const [appliedFilters, setAppliedFilters] = React.useState<ReportFilterOptions>(filters);
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = React.useState<number>(1);
+  const [pageSize, setPageSize] = React.useState<number>(10);
+
+  // Print & Summary Modal State
+  const [printModalOpen, setPrintModalOpen] = React.useState<boolean>(false);
+  const [printModalMode, setPrintModalMode] = React.useState<"print" | "summary">("print");
+  const [selectedCardLabel, setSelectedCardLabel] = React.useState<string | undefined>();
+
+  // Switch category and select first sub-tab
+  const handleSelectCategory = (cat: HealthrayCategory) => {
+    setActiveCategory(cat);
+    setActiveSubTabId(cat.subTabs[0].id);
+    setCurrentPage(1);
+    setSelectedCardLabel(undefined);
+  };
+
+  // Switch sub-tab
+  const handleSelectSubTab = (subTabId: string) => {
+    setActiveSubTabId(subTabId);
+    setCurrentPage(1);
+    setSelectedCardLabel(undefined);
+  };
+
+  // Generate Report Data
+  const reportData: ReportDataResult = React.useMemo(() => {
+    return ReportsService.generateReport(activeSubTabId, store, appliedFilters);
+  }, [activeSubTabId, store, appliedFilters]);
+
+  // Apply Filter Action
+  const handleApplyFilter = () => {
+    setAppliedFilters({ ...filters });
+    setCurrentPage(1);
+  };
+
+  // Reset Filter Action
+  const handleResetFilter = () => {
+    const defaultFilters: ReportFilterOptions = {
+      duration: "month",
+      startDate: "2026-11-01",
+      endDate: "2026-11-30",
+      startTime: "00:00",
+      endTime: "23:59",
+      doctorId: "all",
+      department: "all",
+      paymentMode: "all",
+      searchQuery: "",
+      encounterType: "all",
+      dueOnly: false,
+      cancelled: false,
+      settled: false,
+    };
+    setFilters(defaultFilters);
+    setAppliedFilters(defaultFilters);
+    setCurrentPage(1);
+    setSelectedCardLabel(undefined);
+  };
+
+  // Interactive KPI Card Filter Toggle
+  const handleSelectCard = (label: string) => {
+    if (selectedCardLabel === label) {
+      // Clear quick filter on second click
+      setSelectedCardLabel(undefined);
+      const updated = { ...filters, dueOnly: false, settled: false };
+      setFilters(updated);
+      setAppliedFilters(updated);
+    } else {
+      setSelectedCardLabel(label);
+      const upper = label.toUpperCase();
+      if (upper.includes("DUE") || upper.includes("OUTSTANDING")) {
+        const updated = { ...filters, dueOnly: true, settled: false };
+        setFilters(updated);
+        setAppliedFilters(updated);
+      } else if (upper.includes("PAID") || upper.includes("SETTLED")) {
+        const updated = { ...filters, dueOnly: false, settled: true };
+        setFilters(updated);
+        setAppliedFilters(updated);
+      }
+    }
+    setCurrentPage(1);
+  };
+
+  // CSV Export Action
+  const handleExportCsv = () => {
+    const filename = `${activeCategory.id}_${activeSubTabId}`;
+    const columns = reportData.meta.columns.map((c) => ({
+      header: c.header,
+      accessor: c.key,
+    }));
+    exportToCsv(filename, columns, reportData.rows);
+  };
+
+  // Print Preview
+  const handleOpenPrintPreview = () => {
+    setPrintModalMode("print");
+    setPrintModalOpen(true);
+  };
+
+  // Billing Summary Modal
+  const handleOpenBillingSummary = () => {
+    setPrintModalMode("summary");
+    setPrintModalOpen(true);
+  };
+
+  // Paginated Rows
+  const totalRecords = reportData.rows.length;
+  const totalPages = Math.ceil(totalRecords / pageSize) || 1;
+  const paginatedRows = React.useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return reportData.rows.slice(start, start + pageSize);
+  }, [reportData.rows, currentPage, pageSize]);
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
+    <div className="space-y-4 max-w-[1700px] mx-auto">
+      {/* Top Breadcrumb & Page Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Clinical & Financial Reports (16 Modules)</h1>
-          <p className="text-xs text-slate-500">
-            Real-time analytics for Doctor payouts, GSTR-1/3B, Bed ALOS, cashier registers, and pharmacy margins
+          <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium mb-0.5">
+            <span>Reports</span>
+            <ChevronRight className="h-3 w-3" />
+            <span className="text-slate-700 font-semibold">{activeCategory.title}</span>
+            <ChevronRight className="h-3 w-3" />
+            <span className="text-[#2563EB] font-bold">
+              {activeCategory.subTabs.find((t) => t.id === activeSubTabId)?.title || "Report"}
+            </span>
+          </div>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+            {reportData.meta.title}
+          </h1>
+          <p className="text-xs text-slate-500 mt-0.5">
+            {reportData.meta.description}
           </p>
         </div>
 
+        {/* Header Action Buttons */}
         <div className="flex items-center gap-2">
           <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleOpenPrintPreview}
+            className="h-8 text-xs font-semibold gap-1.5 border-slate-200 text-slate-700 hover:bg-slate-50"
+          >
+            <Printer className="h-3.5 w-3.5 text-slate-500" />
+            Print Report
+          </Button>
+
+          <Button
+            type="button"
             size="sm"
             onClick={handleExportCsv}
-            className="bg-[#2563EB] hover:bg-blue-700 text-xs gap-1.5 font-semibold"
+            className="h-8 text-xs font-semibold gap-1.5 bg-[#2563EB] hover:bg-blue-700 text-white shadow-xs"
           >
-            <Download className="h-3.5 w-3.5" /> Export Report (CSV / Excel)
+            <Download className="h-3.5 w-3.5" />
+            Export (.CSV / Excel)
           </Button>
         </div>
       </div>
 
-      {/* Report Selector Ribbon & Categories */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-        {/* Left List of 16 Reports */}
-        <div className="space-y-3">
-          <Card className="border-slate-200">
-            <CardHeader className="p-3 pb-2">
-              <CardTitle className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center justify-between">
-                <span>Reports Catalog (16)</span>
-                <Badge variant="outline" className="text-[10px] font-mono">{filteredCatalog.length}</Badge>
-              </CardTitle>
+      {/* Main Layout: Left Category Drawer + Right Data Canvas */}
+      <div className="flex gap-4 items-start">
+        {/* Left Collapsible Category Drawer */}
+        <ReportsCategoryDrawer
+          activeCategoryId={activeCategory.id}
+          onSelectCategory={handleSelectCategory}
+          collapsed={drawerCollapsed}
+          onToggleCollapse={() => setDrawerCollapsed((v) => !v)}
+        />
 
-              {/* Category pills */}
-              <div className="grid grid-cols-2 gap-1 pt-2">
-                {[
-                  { id: "all", label: "All" },
-                  { id: "financial", label: "Financial" },
-                  { id: "clinical", label: "Clinical" },
-                  { id: "statutory", label: "Statutory" },
-                ].map((c) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => setCategoryFilter(c.id)}
-                    className={`py-1 rounded text-[10px] font-bold uppercase transition-colors ${
-                      categoryFilter === c.id
-                        ? "bg-[#2563EB] text-white"
-                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                    }`}
-                  >
-                    {c.label}
-                  </button>
-                ))}
-              </div>
-            </CardHeader>
-            <CardContent className="p-0 max-h-[580px] overflow-y-auto">
-              <div className="divide-y divide-slate-100 text-xs">
-                {filteredCatalog.map((rep) => {
-                  const isSelected = selectedReportId === rep.id;
-                  return (
-                    <button
-                      key={rep.id}
-                      type="button"
-                      onClick={() => setSelectedReportId(rep.id)}
-                      className={`w-full p-2.5 text-left transition-colors flex flex-col gap-0.5 ${
-                        isSelected
-                          ? "bg-blue-50/80 border-l-4 border-l-[#2563EB]"
-                          : "hover:bg-slate-50 border-l-4 border-l-transparent"
-                      }`}
-                    >
-                      <span className={`font-semibold text-xs ${isSelected ? "text-[#2563EB]" : "text-slate-900"}`}>
-                        {rep.title}
-                      </span>
-                      <span className="text-[10px] text-slate-500 capitalize">{rep.category}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Right Active Report Canvas (3 cols) */}
-        <div className="lg:col-span-3 space-y-4">
-          {/* Active Report Header Bar */}
-          <div className="p-4 rounded-xl border border-slate-200 bg-white flex flex-wrap items-center justify-between gap-3 shadow-xs">
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold text-slate-900">{reportData.meta.title}</h2>
-                <Badge variant="outline" className="capitalize text-[10px] bg-slate-50">
-                  {reportData.meta.category}
-                </Badge>
-              </div>
-              <p className="text-xs text-slate-500 mt-0.5">{reportData.meta.description}</p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <div className="relative max-w-xs">
-                <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-slate-400" />
-                <Input
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Filter table rows..."
-                  className="pl-8 h-8 text-xs"
-                />
-              </div>
-
-              <select
-                value={dateRange}
-                onChange={(e) => setDateRange(e.target.value)}
-                className="h-8 px-2 rounded border border-slate-200 bg-slate-50 text-xs font-medium"
-              >
-                <option value="today">Today</option>
-                <option value="wtd">Week to Date</option>
-                <option value="mtd">Month to Date</option>
-                <option value="ytd">Year to Date (FY 2026-27)</option>
-              </select>
-            </div>
+        {/* Right Main Content Canvas */}
+        <div className="flex-1 min-w-0 space-y-3">
+          {/* 1. Horizontal Sub-Tabs Bar */}
+          <div className="bg-white border border-slate-200 rounded-xl p-1.5 shadow-xs overflow-x-auto scrollbar-none flex items-center gap-1">
+            {activeCategory.subTabs.map((tab) => {
+              const isSelected = activeSubTabId === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => handleSelectSubTab(tab.id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
+                    isSelected
+                      ? "bg-[#2563EB] text-white shadow-xs"
+                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/80"
+                  }`}
+                >
+                  {tab.title}
+                </button>
+              );
+            })}
           </div>
 
-          {/* Report Summary Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {reportData.summaryCards.map((card) => (
-              <Card key={card.label} className="border-slate-200">
-                <CardContent className="p-3.5">
-                  <span className="text-[11px] font-semibold text-slate-500">{card.label}</span>
-                  <div className="text-xl font-bold text-slate-900 mt-0.5">{card.value}</div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          {/* 2. Multi-Field Filter Ribbon */}
+          <ReportsFilterRibbon
+            filters={filters}
+            onFilterChange={setFilters}
+            onApply={handleApplyFilter}
+            onReset={handleResetFilter}
+            onExportCsv={handleExportCsv}
+            onPrintPreview={handleOpenPrintPreview}
+            onOpenBillingSummary={handleOpenBillingSummary}
+          />
 
-          {/* Report High-Density Tabular View */}
-          <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-xs">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  {reportData.meta.columns.map((col) => (
-                    <TableHead key={col.key}>{col.header}</TableHead>
-                  ))}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredRows.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={reportData.meta.columns.length} className="text-center py-8 text-xs text-slate-400">
-                      No records found for this report and search filter.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredRows.map((row, idx) => (
-                    <TableRow key={idx}>
-                      {reportData.meta.columns.map((col) => (
-                        <TableCell key={col.key} className="text-xs">
-                          {String(row[col.key] ?? "—")}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+          {/* 3. Top KPI Statistical Summary Cards */}
+          <ReportsKpiSummaryCards
+            cards={reportData.summaryCards}
+            selectedCardLabel={selectedCardLabel}
+            onSelectCard={handleSelectCard}
+          />
+
+          {/* 4. Enterprise High-Density Data Table */}
+          <ReportsDataTable
+            columns={reportData.meta.columns}
+            rows={paginatedRows}
+            totals={reportData.totals}
+            emptyMessage="No records found matching current duration and filter criteria."
+          />
+
+          {/* 5. Bottom Summary & Pagination Bar */}
+          <ReportsPagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            totalRecords={totalRecords}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setCurrentPage(1);
+            }}
+          />
         </div>
       </div>
+
+      {/* Print Preview & Billing Summary Modal */}
+      <ReportsPrintModal
+        open={printModalOpen}
+        onOpenChange={setPrintModalOpen}
+        reportData={reportData}
+        filters={appliedFilters}
+        mode={printModalMode}
+      />
     </div>
   );
 }
