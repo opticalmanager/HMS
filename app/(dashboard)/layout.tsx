@@ -15,7 +15,6 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const isOpd = pathname === "/opd";
   const [commandOpen, setCommandOpen] = React.useState(false);
-  const [isOffline, setIsOffline] = React.useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
 
   // Global Keyboard Shortcut: Ctrl+B or Cmd+B to smartly toggle navigation sidebar
@@ -35,20 +34,6 @@ export default function DashboardLayout({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  React.useEffect(() => {
-    const handleOnline = () => setIsOffline(false);
-    const handleOffline = () => setIsOffline(true);
-
-    setIsOffline(!navigator.onLine);
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
-
-    return () => {
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
-    };
-  }, []);
-
   return (
     <div className="flex min-h-screen bg-[#F6F7F9]">
       <AppSidebar
@@ -58,9 +43,6 @@ export default function DashboardLayout({
       <div className="flex-1 flex flex-col min-w-0">
         <AppTopbar
           onOpenCommand={() => setCommandOpen(true)}
-          isOffline={isOffline}
-          sidebarCollapsed={sidebarCollapsed}
-          onToggleSidebar={() => setSidebarCollapsed((v) => !v)}
         />
         <main
           className={cn(

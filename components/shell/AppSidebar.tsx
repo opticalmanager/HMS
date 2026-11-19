@@ -94,11 +94,6 @@ export function AppSidebar({ collapsed = false, onToggleCollapse }: AppSidebarPr
             <ChevronRight className="h-4 w-4" />
           </button>
         )}
-        {!collapsed && (
-          <div className="px-2 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-            Modules (12)
-          </div>
-        )}
         {NAV_ITEMS.map((item) => {
           const isActive = pathname === item.href || pathname?.startsWith(`${item.href}/`);
           const Icon = item.icon;

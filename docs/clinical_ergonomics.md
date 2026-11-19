@@ -20,7 +20,7 @@ Doctors and staff can press **`Ctrl+K`** (or `Cmd+K` on macOS) from anywhere in 
 - Search patients by UHID, Mobile Number, or Full Name.
 - Look up doctors by department or specialization.
 
-Staff can also press **`Ctrl+B`** (or `Cmd+B` on macOS) or click the smart toggle button in the Topbar/Sidebar header to minimize or maximize the navigation sidebar at will:
+Staff can also press **`Ctrl+B`** (or `Cmd+B` on macOS) or click the chevron toggle button directly in the Sidebar header to minimize or maximize the navigation sidebar at will:
 - Sidebar remains fully available and open (`w-64`) by default across all clinical workflows including OPD.
 - When maximized, the OPD clinical desk features clean, proportionate card layouts, single-line status strips, and a permanently docked bottom action bar.
 - Doctors who desire maximum screen width can toggle the navigation panel to compact icon mode (`w-16`) or expand it back instantly.
