@@ -226,12 +226,14 @@ export function PrescriptionPrintModal({
 
             <div className="text-center w-56">
               <div className="font-serif italic text-base text-slate-700 tracking-wider">
-                Dr. Gaurav Kumar
+                {patient.doctorName || "Consulting Physician"}
               </div>
               <div className="border-t border-slate-400 mt-1 pt-1 font-bold text-xs text-slate-900">
                 Attending Doctor Signature
               </div>
-              <div className="text-[10px] text-slate-500">MCI-2015-48291 (DM Cardiology)</div>
+              <div className="text-[10px] text-slate-500">
+                {patient.department ? `${patient.department} Specialist` : "Consulting Physician"}
+              </div>
             </div>
           </div>
         </div>

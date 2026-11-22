@@ -27,12 +27,6 @@ interface AppointmentBookingModalProps {
   initialDate?: string;
 }
 
-const DOCTORS = [
-  { id: "doc-1", name: "Dr. Gaurav Kumar", dept: "Cardiology", fee: 800 },
-  { id: "doc-2", name: "Dr. Ananya Sharma", dept: "General Medicine", fee: 500 },
-  { id: "doc-3", name: "Dr. Rajesh Varma", dept: "Orthopedics", fee: 700 },
-];
-
 const TIME_SLOTS = [
   { time: "09:30 AM", session: "Morning", available: true },
   { time: "10:00 AM", session: "Morning", available: true },
@@ -54,6 +48,27 @@ export function AppointmentBookingModal({
 }: AppointmentBookingModalProps) {
   const store = useClinicalStore();
 
+  const doctors = React.useMemo(() => {
+    const staffDocs = store.staff.filter(
+      (s) =>
+        s.role === "doctor" ||
+        s.role.includes("doctor") ||
+        s.role.includes("consultant") ||
+        s.role.includes("specialist")
+    );
+    if (staffDocs.length === 0) {
+      return [
+        { id: "doc-gen", name: "General Physician", dept: "General OPD", fee: 500 },
+      ];
+    }
+    return staffDocs.map((s) => ({
+      id: s.id,
+      name: s.name,
+      dept: s.department || "General",
+      fee: 600,
+    }));
+  }, [store.staff]);
+
   const [searchPatient, setSearchPatient] = React.useState("");
   const [selectedPatient, setSelectedPatient] = React.useState<Patient | null>(initialPatient);
 
@@ -61,15 +76,27 @@ export function AppointmentBookingModal({
     fullName: initialPatient?.fullName || "",
     phone: initialPatient?.phone || "",
     uhid: initialPatient?.uhid || "",
-    doctorId: DOCTORS[0].id,
-    doctorName: DOCTORS[0].name,
-    department: DOCTORS[0].dept,
+    doctorId: "",
+    doctorName: "",
+    department: "",
     appointmentDate: initialDate || new Date().toISOString().split("T")[0],
     timeSlot: "10:00 AM",
     priority: "normal" as "normal" | "urgent" | "emergency",
-    chiefComplaints: "General consultation and health review",
-    fee: DOCTORS[0].fee,
+    chiefComplaints: "",
+    fee: 500,
   });
+
+  React.useEffect(() => {
+    if (doctors.length > 0 && !formData.doctorId) {
+      setFormData((prev) => ({
+        ...prev,
+        doctorId: doctors[0].id,
+        doctorName: doctors[0].name,
+        department: doctors[0].dept,
+        fee: doctors[0].fee,
+      }));
+    }
+  }, [doctors, formData.doctorId]);
 
   React.useEffect(() => {
     if (open) {
@@ -115,7 +142,7 @@ export function AppointmentBookingModal({
   };
 
   const handleDoctorChange = (docId: string) => {
-    const doc = DOCTORS.find((d) => d.id === docId);
+    const doc = doctors.find((d) => d.id === docId);
     if (doc) {
       setFormData((prev) => ({
         ...prev,
@@ -299,7 +326,7 @@ export function AppointmentBookingModal({
               <Input
                 value={formData.fullName}
                 onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                placeholder="e.g. Ramesh Patel"
+                placeholder="Enter patient full name"
                 required
               />
             </div>
@@ -313,7 +340,7 @@ export function AppointmentBookingModal({
                   const val = e.target.value.replace(/\D/g, "").slice(0, 10);
                   setFormData({ ...formData, phone: val });
                 }}
-                placeholder="e.g. 9823012345"
+                placeholder="Enter 10-digit mobile number"
                 inputMode="numeric"
                 maxLength={10}
                 required
@@ -327,7 +354,7 @@ export function AppointmentBookingModal({
               Select Attending Doctor & Department
             </label>
             <div className="grid grid-cols-3 gap-2">
-              {DOCTORS.map((doc) => {
+              {doctors.map((doc) => {
                 const isSelected = formData.doctorId === doc.id;
                 return (
                   <button

@@ -36,15 +36,7 @@ export class AuthService {
       }
     }
 
-    // Default mock user for local clinical development when cookies are empty
-    return {
-      id: "usr-doc-001",
-      email: "dr.gaurav@apexhospital.org",
-      fullName: "Dr. Gaurav Kumar, MD",
-      role: "doctor",
-      organizationId: "org-apex-001",
-      branchId: "br-main-001",
-      isOffline: false,
-    };
+    // Return null when unauthenticated
+    return null;
   }
 }

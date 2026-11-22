@@ -33,9 +33,9 @@ export function TemplatePreviewModal({
             <p>
               Your digital clinical prescription for consultation{" "}
               <span className="font-mono font-bold text-blue-700">
-                {message.params?.consultationNumber || "OPD-2026-000041"}
+                {message.params?.consultationNumber || "OPD"}
               </span>{" "}
-              with {message.params?.doctorName || "Dr. Gaurav Kumar, MD"} is now ready.
+              with {message.params?.doctorName || "your consulting doctor"} is now ready.
             </p>
             <p>Please click the button below to download your signed PDF prescription.</p>
             <div className="pt-2 border-t border-emerald-100 flex justify-center">
@@ -51,12 +51,12 @@ export function TemplatePreviewModal({
           <div className="space-y-2 text-xs text-slate-800">
             <p className="font-semibold">Dear {message.patientName},</p>
             <p>
-              Your appointment at Apex Superspeciality Hospital has been confirmed.
+              Your appointment has been confirmed.
             </p>
             <div className="p-2.5 rounded bg-white/80 border border-slate-200 font-mono space-y-1">
-              <div>Doctor: {message.params?.doctorName || "Dr. Ananya Sharma"}</div>
-              <div>Date & Slot: {message.params?.dateTime || "14-Nov-2026 at 10:30 AM"}</div>
-              <div className="font-bold text-[#2563EB]">Token: #{message.params?.token || "105"}</div>
+              <div>Doctor: {message.params?.doctorName || "Consultant"}</div>
+              <div>Date & Slot: {message.params?.dateTime || "Scheduled OPD Slot"}</div>
+              <div className="font-bold text-[#2563EB]">Token: #{message.params?.token || "—"}</div>
             </div>
             <p className="text-[11px] text-slate-500">Please arrive 15 minutes prior to your slot.</p>
           </div>
@@ -68,8 +68,8 @@ export function TemplatePreviewModal({
             <p className="font-semibold">Payment Receipt Confirmation</p>
             <p>
               Thank you {message.patientName}. We have received your payment of{" "}
-              <span className="font-bold text-slate-900">{message.params?.amountPaid || "₹1,250"}</span> for{" "}
-              <span className="font-mono">{message.params?.invoiceNumber || "INV-2026-000104"}</span>.
+              <span className="font-bold text-slate-900">{message.params?.amountPaid || "—"}</span> for{" "}
+              <span className="font-mono">{message.params?.invoiceNumber || "Invoice"}</span>.
             </p>
             <div className="pt-2 border-t border-emerald-100 flex justify-center">
               <span className="inline-flex items-center gap-1.5 text-[#2563EB] font-bold text-xs py-1">

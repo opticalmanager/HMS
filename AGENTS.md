@@ -10,6 +10,7 @@ Always read `docs/architecture.md` before proposing changes or writing code. You
 2. **Plan First on Multi-File Tasks:** For any feature touching more than 2 files or modifying database schemas, output a concise file-by-file plan and wait for confirmation before editing.
 3. **One Phase at a Time:** Follow the phased roadmap in `docs/architecture.md`. Do NOT scaffold future phases (e.g., Dograh routes, Redis semantic cache, or MCP endpoints) unless explicitly requested in the current task.
 4. **No Silent Scope Expansion:** Do not refactor unrelated UI pages, change styling libraries, or upgrade major packages without asking.
+5. **Mandatory Documentation Update on Every Feature:** Whenever implementing, updating, or refactoring any feature, database schema, API route, or workflow, you MUST immediately update the corresponding documentation files in the `docs/` directory. Never treat documentation as an afterthought—code changes and docs updates must happen in lockstep to maintain an accurate project audit trail.
 
 ---
 
@@ -83,6 +84,7 @@ Before marking any task complete, verify and report:
 - [ ] Zod validates all external inputs and LLM outputs.
 - [ ] TypeScript compiles cleanly (`npm run typecheck` / `tsc --noEmit`) and migrations (if any) are safe and reversible.
 - [ ] No secrets, PII, or raw transcripts are logged.
+- [ ] Relevant documentation files in `docs/` are updated to reflect the new feature, schema, route, or workflow changes.
 
 ---
 
@@ -111,5 +113,12 @@ Before marking any task complete, verify and report:
 4. **Zero-Positional Selectors & Strict Print Isolation**:
    - Never use positional DOM selectors (e.g. `> div:first-child`, `> * > *`) in CSS.
    - Layout components must declare their own print visibility explicitly using `print:hidden` or semantic attributes (`[data-sidebar]`, `[data-topbar]`).
-5. **Synchronized Documentation Maintenance (`docs/`)**:
-   - System documentation in `docs/` (`architecture.md`, `tech_stack.md`, `database_schema.md`, etc.) must always remain 100% synchronized with the live codebase.
+5. **Synchronized Documentation Maintenance & Tracking (`docs/`):**
+   - System documentation in `docs/` must always remain 100% synchronized with the live codebase after every feature update:
+     - **Database updates (Drizzle schema/migrations):** Update `docs/database_schema.md`.
+     - **API routes & Server Actions:** Update `docs/api_contract.md`.
+     - **Roles, permissions, or access control:** Update `docs/rbac_matrix.md`.
+     - **Feature workflows, user flows, UI screens:** Update `docs/modules_workflow.md`.
+     - **System architecture, external services, or core stack:** Update `docs/architecture.md` and `docs/tech_stack.md`.
+     - **Overall project status & module completion:** Update `docs/overview.md`.
+   - Never consider a feature complete until its corresponding documentation in `docs/` has been updated to maintain an accurate project audit trail.

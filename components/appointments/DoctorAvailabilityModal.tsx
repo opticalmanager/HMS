@@ -20,12 +20,6 @@ interface DoctorAvailabilityModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const DOCTORS = [
-  { id: "doc-1", name: "Dr. Gaurav Kumar", dept: "Cardiology" },
-  { id: "doc-2", name: "Dr. Ananya Sharma", dept: "General Medicine" },
-  { id: "doc-3", name: "Dr. Rajesh Varma", dept: "Orthopedics" },
-];
-
 const DAYS = [
   { index: 1, name: "Monday" },
   { index: 2, name: "Tuesday" },
@@ -42,17 +36,46 @@ export function DoctorAvailabilityModal({
 }: DoctorAvailabilityModalProps) {
   const store = useClinicalStore();
 
-  const [selectedDoctorId, setSelectedDoctorId] = React.useState<string>("doc-1");
+  const doctors = React.useMemo(() => {
+    const docs = store.staff.filter(
+      (s) =>
+        s.role === "doctor" ||
+        s.role.includes("doctor") ||
+        s.role.includes("consultant") ||
+        s.role.includes("specialist")
+    );
+    if (docs.length === 0) {
+      return [{ id: "doc-gen", name: "General Physician", dept: "General OPD" }];
+    }
+    return docs.map((d) => ({
+      id: d.id,
+      name: d.name,
+      dept: d.department || "General",
+    }));
+  }, [store.staff]);
+
+  const [selectedDoctorId, setSelectedDoctorId] = React.useState<string>("");
   const [schedule, setSchedule] = React.useState<DoctorWeeklySchedule | null>(null);
+
+  React.useEffect(() => {
+    if (doctors.length > 0 && (!selectedDoctorId || !doctors.some((d) => d.id === selectedDoctorId))) {
+      setSelectedDoctorId(doctors[0].id);
+    }
+  }, [doctors, selectedDoctorId]);
 
   // Load active schedule whenever doctor changes or modal opens
   React.useEffect(() => {
     if (!open) return;
-    const existing = store.doctorAvailabilities?.[selectedDoctorId];
+    const activeDoctorId = selectedDoctorId || doctors[0]?.id || "doc-1";
+    const existing =
+      store.doctorAvailabilities?.[activeDoctorId] ||
+      (activeDoctorId === "usr-1" ? store.doctorAvailabilities?.["doc-1"] : undefined) ||
+      (activeDoctorId === "usr-2" ? store.doctorAvailabilities?.["doc-2"] : undefined) ||
+      (activeDoctorId === "usr-3" ? store.doctorAvailabilities?.["doc-3"] : undefined);
     if (existing) {
       setSchedule(JSON.parse(JSON.stringify(existing)));
     } else {
-      const doc = DOCTORS.find((d) => d.id === selectedDoctorId) || DOCTORS[0];
+      const doc = doctors.find((d) => d.id === activeDoctorId) || doctors[0];
       setSchedule({
         doctorId: doc.id,
         doctorName: doc.name,
@@ -70,7 +93,7 @@ export function DoctorAvailabilityModal({
         },
       });
     }
-  }, [open, selectedDoctorId, store.doctorAvailabilities]);
+  }, [open, selectedDoctorId, doctors, store.doctorAvailabilities]);
 
   if (!schedule) return null;
 
@@ -146,7 +169,7 @@ export function DoctorAvailabilityModal({
                 onChange={(e) => setSelectedDoctorId(e.target.value)}
                 className="w-full h-9 rounded-md border border-slate-200 bg-white px-3 text-xs text-slate-800"
               >
-                {DOCTORS.map((d) => (
+                {doctors.map((d) => (
                   <option key={d.id} value={d.id}>
                     {d.name} ({d.dept})
                   </option>

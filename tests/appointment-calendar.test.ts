@@ -1,10 +1,13 @@
-import { describe, it } from "node:test";
+import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { clinicalStore } from "../services/clinical-store";
 import { AppointmentService } from "../services/appointment.service";
 import type { DoctorBlock, DoctorWeeklySchedule, Appointment } from "../types/hms";
 
 describe("Appointment & Calendar Engine Tests", () => {
+  beforeEach(() => {
+    clinicalStore.seedDemoData();
+  });
   describe("Doctor Break & Slot Blocking Logic", () => {
     it("should detect when a slot falls within a doctor block range", () => {
       const sampleBlock: DoctorBlock = {

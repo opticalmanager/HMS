@@ -278,6 +278,55 @@ const INITIAL_DOCTOR_AVAILABILITIES: Record<string, DoctorWeeklySchedule> = {
       6: { isActive: true, morningStart: "10:00", morningEnd: "13:00", eveningStart: "16:00", eveningEnd: "18:00" },
     },
   },
+  // Alias keys matching StaffMember id (usr-1, usr-2, usr-3) for consistent lookup
+  "usr-1": {
+    doctorId: "usr-1",
+    doctorName: "Dr. Gaurav Kumar",
+    department: "Cardiology",
+    slotDurationMinutes: 15,
+    maxOverbookingSlots: 5,
+    days: {
+      0: { isActive: false, morningStart: "09:00", morningEnd: "13:00", eveningStart: "16:00", eveningEnd: "20:00" },
+      1: { isActive: true, morningStart: "09:00", morningEnd: "13:00", eveningStart: "16:00", eveningEnd: "20:00" },
+      2: { isActive: true, morningStart: "09:00", morningEnd: "13:00", eveningStart: "16:00", eveningEnd: "20:00" },
+      3: { isActive: true, morningStart: "09:00", morningEnd: "13:00", eveningStart: "16:00", eveningEnd: "20:00" },
+      4: { isActive: true, morningStart: "09:00", morningEnd: "13:00", eveningStart: "16:00", eveningEnd: "20:00" },
+      5: { isActive: true, morningStart: "09:00", morningEnd: "13:00", eveningStart: "16:00", eveningEnd: "20:00" },
+      6: { isActive: true, morningStart: "09:00", morningEnd: "14:00", eveningStart: "16:00", eveningEnd: "18:00" },
+    },
+  },
+  "usr-2": {
+    doctorId: "usr-2",
+    doctorName: "Dr. Ananya Sharma",
+    department: "General Medicine",
+    slotDurationMinutes: 15,
+    maxOverbookingSlots: 6,
+    days: {
+      0: { isActive: false, morningStart: "09:00", morningEnd: "13:00", eveningStart: "16:00", eveningEnd: "20:00" },
+      1: { isActive: true, morningStart: "09:30", morningEnd: "13:30", eveningStart: "16:30", eveningEnd: "20:30" },
+      2: { isActive: true, morningStart: "09:30", morningEnd: "13:30", eveningStart: "16:30", eveningEnd: "20:30" },
+      3: { isActive: true, morningStart: "09:30", morningEnd: "13:30", eveningStart: "16:30", eveningEnd: "20:30" },
+      4: { isActive: true, morningStart: "09:30", morningEnd: "13:30", eveningStart: "16:30", eveningEnd: "20:30" },
+      5: { isActive: true, morningStart: "09:30", morningEnd: "13:30", eveningStart: "16:30", eveningEnd: "20:30" },
+      6: { isActive: true, morningStart: "09:30", morningEnd: "14:00", eveningStart: "16:00", eveningEnd: "19:00" },
+    },
+  },
+  "usr-3": {
+    doctorId: "usr-3",
+    doctorName: "Dr. Rajesh Varma",
+    department: "Orthopedics",
+    slotDurationMinutes: 20,
+    maxOverbookingSlots: 4,
+    days: {
+      0: { isActive: false, morningStart: "10:00", morningEnd: "13:00", eveningStart: "16:00", eveningEnd: "19:00" },
+      1: { isActive: true, morningStart: "10:00", morningEnd: "13:00", eveningStart: "16:00", eveningEnd: "19:00" },
+      2: { isActive: true, morningStart: "10:00", morningEnd: "13:00", eveningStart: "16:00", eveningEnd: "19:00" },
+      3: { isActive: true, morningStart: "10:00", morningEnd: "13:00", eveningStart: "16:00", eveningEnd: "19:00" },
+      4: { isActive: true, morningStart: "10:00", morningEnd: "13:00", eveningStart: "16:00", eveningEnd: "19:00" },
+      5: { isActive: true, morningStart: "10:00", morningEnd: "13:00", eveningStart: "16:00", eveningEnd: "19:00" },
+      6: { isActive: true, morningStart: "10:00", morningEnd: "13:00", eveningStart: "16:00", eveningEnd: "18:00" },
+    },
+  },
 };
 
 const INITIAL_PATIENTS: Patient[] = [
@@ -1743,7 +1792,7 @@ const INITIAL_RBAC_MATRIX: RbacMatrix = {
 class ClinicalStore {
   private state: ClinicalStoreState;
   private listeners: Set<() => void> = new Set();
-  private readonly STORAGE_KEY = "apex_hms_clinical_state_v1";
+  private readonly STORAGE_KEY = "apex_hms_clinical_state_v2";
 
   constructor() {
     this.state = this.loadInitialState();
@@ -1752,6 +1801,10 @@ class ClinicalStore {
   private loadInitialState(): ClinicalStoreState {
     if (typeof window !== "undefined") {
       try {
+        // Clear legacy v1 state to prevent stale dummy cache from leaking into production
+        if (localStorage.getItem("apex_hms_clinical_state_v1")) {
+          localStorage.removeItem("apex_hms_clinical_state_v1");
+        }
         const saved = localStorage.getItem(this.STORAGE_KEY);
         if (saved) {
           const parsed = JSON.parse(saved);
@@ -1768,16 +1821,49 @@ class ClinicalStore {
   }
 
   private getDefaultState(): ClinicalStoreState {
+    const vacantBeds: Bed[] = INITIAL_BEDS.map((bed) => ({
+      ...bed,
+      status: "available",
+      currentPatientId: null,
+      currentAdmissionId: null,
+      patientName: null,
+    }));
+
     return {
-      patients: INITIAL_PATIENTS,
-      appointments: INITIAL_APPOINTMENTS,
-      doctorBlocks: INITIAL_DOCTOR_BLOCKS,
+      patients: [],
+      appointments: [],
+      doctorBlocks: [],
       doctorAvailabilities: INITIAL_DOCTOR_AVAILABILITIES,
       consultations: [],
-      patientAllergies: INITIAL_PATIENT_ALLERGIES,
-      clinicalAttachments: INITIAL_CLINICAL_ATTACHMENTS,
-      opdConsultations: INITIAL_OPD_CONSULTATIONS,
-      beds: INITIAL_BEDS,
+      patientAllergies: [],
+      clinicalAttachments: [],
+      opdConsultations: {},
+      beds: vacantBeds,
+      admissions: [],
+      nursingMar: [],
+      invoices: [],
+      cashierShift: INITIAL_CASHIER_SHIFT,
+      inventory: INITIAL_INVENTORY,
+      grnRecords: [],
+      whatsappLogs: [],
+      auditLogs: [],
+      settings: INITIAL_SETTINGS,
+      staff: INITIAL_STAFF,
+      rbacMatrix: INITIAL_RBAC_MATRIX,
+    };
+  }
+
+  public seedDemoData(): void {
+    this.state = {
+      patients: JSON.parse(JSON.stringify(INITIAL_PATIENTS)),
+      appointments: JSON.parse(JSON.stringify(INITIAL_APPOINTMENTS)),
+      doctorBlocks: JSON.parse(JSON.stringify(INITIAL_DOCTOR_BLOCKS)),
+      doctorAvailabilities: JSON.parse(JSON.stringify(INITIAL_DOCTOR_AVAILABILITIES)),
+      consultations: [],
+      patientAllergies: JSON.parse(JSON.stringify(INITIAL_PATIENT_ALLERGIES)),
+      clinicalAttachments: JSON.parse(JSON.stringify(INITIAL_CLINICAL_ATTACHMENTS)),
+      opdConsultations: JSON.parse(JSON.stringify(INITIAL_OPD_CONSULTATIONS)),
+      beds: JSON.parse(JSON.stringify(INITIAL_BEDS)),
       admissions: [
         {
           id: "IPD-2026-0001",
@@ -1797,10 +1883,10 @@ class ClinicalStore {
           updatedAt: "2026-11-14T09:00:00Z",
         },
       ],
-      nursingMar: INITIAL_NURSING_MAR,
-      invoices: INITIAL_INVOICES,
-      cashierShift: INITIAL_CASHIER_SHIFT,
-      inventory: INITIAL_INVENTORY,
+      nursingMar: JSON.parse(JSON.stringify(INITIAL_NURSING_MAR)),
+      invoices: JSON.parse(JSON.stringify(INITIAL_INVOICES)),
+      cashierShift: JSON.parse(JSON.stringify(INITIAL_CASHIER_SHIFT)),
+      inventory: JSON.parse(JSON.stringify(INITIAL_INVENTORY)),
       grnRecords: [
         {
           id: "grn-1",
@@ -1826,12 +1912,18 @@ class ClinicalStore {
           verifiedBy: "Karan Johar",
         },
       ],
-      whatsappLogs: INITIAL_WHATSAPP_LOGS,
-      auditLogs: INITIAL_AUDIT_LOGS,
-      settings: INITIAL_SETTINGS,
-      staff: INITIAL_STAFF,
-      rbacMatrix: INITIAL_RBAC_MATRIX,
+      whatsappLogs: JSON.parse(JSON.stringify(INITIAL_WHATSAPP_LOGS)),
+      auditLogs: JSON.parse(JSON.stringify(INITIAL_AUDIT_LOGS)),
+      settings: JSON.parse(JSON.stringify(INITIAL_SETTINGS)),
+      staff: JSON.parse(JSON.stringify(INITIAL_STAFF)),
+      rbacMatrix: JSON.parse(JSON.stringify(INITIAL_RBAC_MATRIX)),
     };
+    this.persist();
+  }
+
+  public clearAllData(): void {
+    this.state = this.getDefaultState();
+    this.persist();
   }
 
   private persist() {
@@ -2079,13 +2171,18 @@ class ClinicalStore {
     if (!bed) return;
 
     const admissionNumber = `IPD-2026-000${Math.floor(10 + Math.random() * 90)}`;
+    const matchedDoc = this.state.staff.find(
+      (s) => s.id === patient.admittingDoctor || s.name.toLowerCase() === patient.admittingDoctor.toLowerCase()
+    );
+    const resolvedDoctorId = matchedDoc ? matchedDoc.id : patient.admittingDoctor;
+
     const newAdmission: IpdAdmission = {
       id: admissionNumber,
       admissionNumber,
       organizationId: bed.organizationId,
       branchId: bed.branchId,
       patientId: patient.patientId,
-      primaryDoctorId: patient.admittingDoctor,
+      primaryDoctorId: resolvedDoctorId,
       wardId: bed.wardId,
       bedId: bed.id,
       admissionDate: new Date().toISOString().split("T")[0],

@@ -30,8 +30,8 @@ export default function WhatsAppPage() {
   const [selectedMessage, setSelectedMessage] = React.useState<WhatsAppLogItem | null>(null);
 
   // Test dispatcher form state
-  const [testPhone, setTestPhone] = React.useState("9823012345");
-  const [testPatient, setTestPatient] = React.useState("Ramesh Patel");
+  const [testPhone, setTestPhone] = React.useState("");
+  const [testPatient, setTestPatient] = React.useState("");
   const [testTemplate, setTestTemplate] = React.useState("prescription_ready_v1");
   const [isSending, setIsSending] = React.useState(false);
   const [sendSuccess, setSendSuccess] = React.useState(false);
@@ -53,13 +53,16 @@ export default function WhatsAppPage() {
     if (!testPhone || !testPatient) return;
 
     setIsSending(true);
+    const activeDoctor =
+      store.staff.find((s) => s.role.includes("doctor") || s.role.includes("consultant"))?.name ||
+      "Consulting Physician";
 
     if (testTemplate === "prescription_ready_v1") {
       await WabaService.sendPrescriptionReady({
         phone: testPhone,
         patientName: testPatient,
         consultationNumber: `OPD-2026-0000${Math.floor(100 + Math.random() * 900)}`,
-        doctorName: "Dr. Gaurav Kumar, MD",
+        doctorName: activeDoctor,
         pdfDownloadUrl: "https://portal.apexhospital.org/rx/sample.pdf",
       }).catch(() => {});
     }
@@ -71,7 +74,7 @@ export default function WhatsAppPage() {
       status: "delivered",
       params: {
         patientName: testPatient,
-        doctorName: "Dr. Gaurav Kumar",
+        doctorName: activeDoctor,
       },
     });
 
@@ -254,7 +257,7 @@ export default function WhatsAppPage() {
                   <Input
                     value={testPhone}
                     onChange={(e) => setTestPhone(e.target.value)}
-                    placeholder="e.g. 9823012345"
+                    placeholder="Enter 10-digit mobile number"
                     required
                   />
                 </div>
@@ -266,7 +269,7 @@ export default function WhatsAppPage() {
                   <Input
                     value={testPatient}
                     onChange={(e) => setTestPatient(e.target.value)}
-                    placeholder="e.g. Ramesh Patel"
+                    placeholder="Enter patient name"
                     required
                   />
                 </div>

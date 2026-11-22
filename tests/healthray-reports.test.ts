@@ -8,6 +8,7 @@ import {
 import { clinicalStore } from "../services/clinical-store";
 
 describe("Healthray 16-Category Enterprise Reports Suite", () => {
+  clinicalStore.seedDemoData();
   const state = clinicalStore.getSnapshot();
 
   test("defines all 16 Healthray Report Categories with sub-tabs", () => {
@@ -84,6 +85,20 @@ describe("Healthray 16-Category Enterprise Reports Suite", () => {
         assert.ok(Array.isArray(res.summaryCards), `Summary cards should exist for ${tab.id}`);
       });
     });
+  });
+
+  test("generates report data for every sub-tab across all 16 categories on an empty store without throwing", () => {
+    clinicalStore.clearAllData();
+    const emptyState = clinicalStore.getSnapshot();
+    HEALTHRAY_REPORT_CATEGORIES.forEach((cat) => {
+      cat.subTabs.forEach((tab) => {
+        const res = ReportsService.generateReport(tab.id, emptyState);
+        assert.ok(res.meta, `Meta should exist for subtab ${tab.id}`);
+        assert.ok(Array.isArray(res.rows), `Rows should be array for ${tab.id}`);
+        assert.ok(Array.isArray(res.summaryCards), `Summary cards should exist for ${tab.id}`);
+      });
+    });
+    clinicalStore.seedDemoData();
   });
 
   test("filters invoices by payment mode and search query correctly", () => {

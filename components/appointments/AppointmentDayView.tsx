@@ -4,6 +4,7 @@ import * as React from "react";
 import type { Appointment, DoctorBlock } from "@/types/hms";
 import { Badge } from "@/components/ui/badge";
 import { Clock, Plus, Coffee, AlertCircle } from "lucide-react";
+import { useClinicalStore } from "@/services/clinical-store";
 
 interface AppointmentDayViewProps {
   selectedDate: string;
@@ -13,12 +14,6 @@ interface AppointmentDayViewProps {
   onSlotClick: (doctorId: string, doctorName: string, timeSlot: string) => void;
   onSelectAppointment: (apt: Appointment) => void;
 }
-
-const DOCTORS = [
-  { id: "doc-1", name: "Dr. Gaurav Kumar", dept: "Cardiology" },
-  { id: "doc-2", name: "Dr. Ananya Sharma", dept: "General Medicine" },
-  { id: "doc-3", name: "Dr. Rajesh Varma", dept: "Orthopedics" },
-];
 
 const HOURS = [
   "08:00 AM",
@@ -55,10 +50,30 @@ export function AppointmentDayView({
   onSlotClick,
   onSelectAppointment,
 }: AppointmentDayViewProps) {
+  const store = useClinicalStore();
+
+  const doctorsList = React.useMemo(() => {
+    const docs = store.staff.filter(
+      (s) =>
+        s.role === "doctor" ||
+        s.role.includes("doctor") ||
+        s.role.includes("consultant") ||
+        s.role.includes("specialist")
+    );
+    if (docs.length === 0) {
+      return [{ id: "doc-gen", name: "General Physician", dept: "General OPD" }];
+    }
+    return docs.map((d) => ({
+      id: d.id,
+      name: d.name,
+      dept: d.department || "General",
+    }));
+  }, [store.staff]);
+
   const visibleDoctors = React.useMemo(() => {
-    if (selectedDoctorId === "all") return DOCTORS;
-    return DOCTORS.filter((d) => d.id === selectedDoctorId);
-  }, [selectedDoctorId]);
+    if (selectedDoctorId === "all") return doctorsList;
+    return doctorsList.filter((d) => d.id === selectedDoctorId);
+  }, [selectedDoctorId, doctorsList]);
 
   return (
     <div className="flex-1 flex flex-col bg-white overflow-hidden border-t border-slate-200 select-none">
@@ -96,14 +111,23 @@ export function AppointmentDayView({
                 const apt = appointments.find(
                   (a) =>
                     a.appointmentDate === selectedDate &&
-                    a.doctorId === doc.id &&
+                    (a.doctorId === doc.id ||
+                      a.doctorName?.toLowerCase() === doc.name.toLowerCase() ||
+                      (doc.id === "usr-1" && a.doctorId === "doc-1") ||
+                      (doc.id === "usr-2" && a.doctorId === "doc-2") ||
+                      (doc.id === "usr-3" && a.doctorId === "doc-3")) &&
                     a.timeSlot === slotTime
                 );
 
                 // Check if slot is blocked (e.g. Lunch break or OT)
                 const block = doctorBlocks.find(
                   (b) =>
-                    (b.doctorId === "all" || b.doctorId === doc.id) &&
+                    (b.doctorId === "all" ||
+                      b.doctorId === doc.id ||
+                      b.doctorName?.toLowerCase() === doc.name.toLowerCase() ||
+                      (doc.id === "usr-1" && b.doctorId === "doc-1") ||
+                      (doc.id === "usr-2" && b.doctorId === "doc-2") ||
+                      (doc.id === "usr-3" && b.doctorId === "doc-3")) &&
                     selectedDate >= b.startDate &&
                     selectedDate <= b.endDate &&
                     (!b.startTime || (slotTime >= b.startTime && slotTime <= (b.endTime || "")))

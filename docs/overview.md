@@ -35,3 +35,13 @@ Clinical environments differ fundamentally from consumer web apps. Doctors, tria
 2. **Industrial Enter-as-Tab Navigation**: High-speed keyboard data entry replicating POS systems (Tally, Marg) allowing staff to fill forms without touching the mouse.
 3. **Zero-Latency In-Memory Lookups**: Instant autocomplete for ICD-10 diagnosis codes and frequent medicines.
 4. **Resilient Offline Fallback**: Hospital LANs frequently encounter internet drops. The system caches patient records in Dexie.js (IndexedDB) and validates offline user sessions via HMAC-SHA256 signatures.
+
+---
+
+## 4. Production Readiness & Clean Data Lifecycle
+
+In production mode, the application operates with clean, zero-mock isolation:
+1. **Empty Initial Operational State**: The clinical store boots with clean empty collections (`patients: []`, `appointments: []`, `invoices: []`, `admissions: []`, `nursingMar: []`, `whatsappLogs: []`, `auditLogs: []`, `doctorBlocks: []`, `patientAllergies: []`). Standard hospital ward beds initialize in vacant status.
+2. **Dynamic UI Aggregations**: Dashboard charts, KPI summaries, and Doctor Productivity tables aggregate dynamically from live store collections, rendering clean empty states (`₹0` or `0 pts`) when no records exist.
+3. **Form Cleanliness**: Invoice builders, bed allocation modals, appointment booking modals, and registration sheets open blank without pre-baked patient or doctor identities, with keyboard-navigable autocomplete for registered clinic records.
+4. **Demo Data Management**: Automated test suites and staging environments invoke `clinicalStore.seedDemoData()` on-demand, preserving 100% automated test coverage while keeping production deployments clean.

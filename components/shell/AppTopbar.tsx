@@ -27,8 +27,8 @@ export function AppTopbar({ onOpenCommand }: AppTopbarProps) {
     router.push("/login");
   };
 
-  const userName = session?.user?.name || "Dr. Gaurav Kumar";
-  const orgName = activeOrg?.name || "Apex Super Specialty";
+  const userName = session?.user?.name || "Staff User";
+  const orgName = activeOrg?.name || "Clinic Portal";
 
   return (
     <header
@@ -81,9 +81,11 @@ export function AppTopbar({ onOpenCommand }: AppTopbarProps) {
             >
               <div className="px-3 py-1.5 border-b border-slate-100 text-[11px]">
                 <div className="font-semibold text-slate-900 truncate">{userName}</div>
-                <div className="text-slate-400 truncate font-mono text-[10px]">
-                  {session?.user?.email || "doctor@apexhospital.org"}
-                </div>
+                {session?.user?.email && (
+                  <div className="text-slate-400 truncate font-mono text-[10px]">
+                    {session.user.email}
+                  </div>
+                )}
               </div>
 
               <button

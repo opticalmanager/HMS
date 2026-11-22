@@ -32,19 +32,41 @@ export function QuickPatientRegistrationModal({
     title: "Mr.",
     fullName: "",
     gender: "male" as PatientGender,
-    age: "32",
+    age: "",
     dateOfBirth: "",
     phone: "",
     email: "",
     bloodGroup: "B+" as BloodGroup,
     address: "",
-    city: "New Delhi",
-    pincode: "110024",
+    city: "",
+    pincode: "",
     emergencyName: "",
     emergencyPhone: "",
-    emergencyRelation: "Spouse",
+    emergencyRelation: "Relative",
     abhaId: "",
   });
+
+  React.useEffect(() => {
+    if (open) {
+      setForm({
+        title: "Mr.",
+        fullName: "",
+        gender: "male",
+        age: "",
+        dateOfBirth: "",
+        phone: "",
+        email: "",
+        bloodGroup: "B+",
+        address: "",
+        city: "",
+        pincode: "",
+        emergencyName: "",
+        emergencyPhone: "",
+        emergencyRelation: "Relative",
+        abhaId: "",
+      });
+    }
+  }, [open]);
 
   const handleChange = (field: string, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -167,7 +189,7 @@ export function QuickPatientRegistrationModal({
                   <Input
                     value={form.fullName}
                     onChange={(e) => handleChange("fullName", e.target.value)}
-                    placeholder="e.g. Ramesh Kumar Patel"
+                    placeholder="Enter patient full name"
                     className="h-9 text-xs"
                     required
                   />
@@ -231,7 +253,7 @@ export function QuickPatientRegistrationModal({
                     maxLength={10}
                     value={form.phone}
                     onChange={(e) => handleChange("phone", e.target.value.replace(/\D/g, ""))}
-                    placeholder="e.g. 9871900034"
+                    placeholder="Enter 10-digit mobile number"
                     className="h-9 text-xs font-mono"
                     required
                   />

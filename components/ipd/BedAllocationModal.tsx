@@ -30,13 +30,37 @@ export function BedAllocationModal({
 }: BedAllocationModalProps) {
   const store = useClinicalStore();
   const [patientSearch, setPatientSearch] = React.useState("");
+
+  const doctors = React.useMemo(() => {
+    return store.staff.filter(
+      (s) =>
+        s.role === "doctor" ||
+        s.role.includes("doctor") ||
+        s.role.includes("consultant") ||
+        s.role.includes("specialist")
+    );
+  }, [store.staff]);
+
   const [formData, setFormData] = React.useState({
-    patientId: "pat-1",
-    patientName: "Ramesh Patel",
-    admittingDoctor: "Dr. Gaurav Kumar",
-    reason: "Severe dyspnea, observation and medical management",
-    advanceDeposit: 10000,
+    patientId: "",
+    patientName: "",
+    admittingDoctor: "",
+    reason: "",
+    advanceDeposit: 0,
   });
+
+  React.useEffect(() => {
+    if (open) {
+      setFormData({
+        patientId: "",
+        patientName: "",
+        admittingDoctor: doctors[0]?.name || "",
+        reason: "",
+        advanceDeposit: 0,
+      });
+      setPatientSearch("");
+    }
+  }, [open, doctors]);
 
   const patientSuggestions = React.useMemo(() => {
     if (!patientSearch.trim()) return [];
@@ -134,11 +158,28 @@ export function BedAllocationModal({
             </div>
             <div>
               <label className="text-xs font-medium text-slate-700 block mb-1">Admitting Doctor</label>
-              <Input
-                value={formData.admittingDoctor}
-                onChange={(e) => setFormData({ ...formData, admittingDoctor: e.target.value })}
-                required
-              />
+              {doctors.length > 0 ? (
+                <select
+                  value={formData.admittingDoctor}
+                  onChange={(e) => setFormData({ ...formData, admittingDoctor: e.target.value })}
+                  className="w-full h-9 rounded-md border border-slate-200 bg-white px-2.5 text-xs text-slate-800"
+                  required
+                >
+                  <option value="">Select Doctor...</option>
+                  {doctors.map((d) => (
+                    <option key={d.id} value={d.name}>
+                      {d.name} ({d.department})
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <Input
+                  value={formData.admittingDoctor}
+                  onChange={(e) => setFormData({ ...formData, admittingDoctor: e.target.value })}
+                  placeholder="Enter doctor name"
+                  required
+                />
+              )}
             </div>
           </div>
 

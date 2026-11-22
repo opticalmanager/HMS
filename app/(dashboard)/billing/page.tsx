@@ -91,11 +91,7 @@ export default function BillingPage() {
       </div>
 
       {activeTab === "create" ? (
-        <InvoiceBuilder
-          patientName="Ramesh Patel"
-          patientPhone="9823012345"
-          uhid="UHID-2026-0041"
-        />
+        <InvoiceBuilder />
       ) : activeTab === "history" ? (
         <Card className="border-slate-200">
           <CardHeader className="flex flex-row items-center justify-between pb-3">

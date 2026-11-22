@@ -21,19 +21,30 @@ interface DoctorBreakBlockModalProps {
   selectedDate?: string;
 }
 
-const DOCTORS = [
-  { id: "all", name: "All Hospital Doctors", dept: "All Departments" },
-  { id: "doc-1", name: "Dr. Gaurav Kumar", dept: "Cardiology" },
-  { id: "doc-2", name: "Dr. Ananya Sharma", dept: "General Medicine" },
-  { id: "doc-3", name: "Dr. Rajesh Varma", dept: "Orthopedics" },
-];
-
 export function DoctorBreakBlockModal({
   open,
   onOpenChange,
   selectedDate = new Date().toISOString().split("T")[0],
 }: DoctorBreakBlockModalProps) {
   const store = useClinicalStore();
+
+  const doctors = React.useMemo(() => {
+    const docs = store.staff.filter(
+      (s) =>
+        s.role === "doctor" ||
+        s.role.includes("doctor") ||
+        s.role.includes("consultant") ||
+        s.role.includes("specialist")
+    );
+    return [
+      { id: "all", name: "All Hospital Doctors", dept: "All Departments" },
+      ...docs.map((d) => ({
+        id: d.id,
+        name: d.name,
+        dept: d.department || "General",
+      })),
+    ];
+  }, [store.staff]);
 
   const [doctorId, setDoctorId] = React.useState<string>("all");
   const [startDate, setStartDate] = React.useState<string>(selectedDate);
@@ -55,7 +66,7 @@ export function DoctorBreakBlockModal({
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    const doctorObj = DOCTORS.find((d) => d.id === doctorId) || DOCTORS[0];
+    const doctorObj = doctors.find((d) => d.id === doctorId) || doctors[0];
 
     const newBlock: DoctorBlock = {
       id: `blk-${Date.now().toString(36)}`,
@@ -106,7 +117,7 @@ export function DoctorBreakBlockModal({
               onChange={(e) => setDoctorId(e.target.value)}
               className="w-full h-9 rounded-md border border-slate-200 bg-white px-3 text-xs text-slate-800"
             >
-              {DOCTORS.map((d) => (
+              {doctors.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.name} ({d.dept})
                 </option>

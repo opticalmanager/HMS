@@ -18,31 +18,80 @@ interface DischargeSummaryModalProps {
   onOpenChange: (open: boolean) => void;
   admission: IpdAdmission | null;
   patientName?: string;
+  doctorName?: string;
 }
 
 export function DischargeSummaryModal({
   open,
   onOpenChange,
   admission,
-  patientName = "Aakash Mehta",
+  patientName,
+  doctorName,
 }: DischargeSummaryModalProps) {
   const store = useClinicalStore();
 
+  const resolvedPatientName =
+    patientName ||
+    store.patients.find((p) => p.id === admission?.patientId)?.fullName ||
+    store.beds.find((b) => b.id === admission?.bedId)?.patientName ||
+    "Inpatient";
+
+  const resolvedDoctorName =
+    doctorName ||
+    store.staff.find((s) => s.id === admission?.primaryDoctorId || s.name.toLowerCase() === admission?.primaryDoctorId.toLowerCase())?.name ||
+    admission?.primaryDoctorId ||
+    "Consulting Physician";
+
+  const lengthOfStay = React.useMemo(() => {
+    if (!admission?.admissionDate) return "1 Day";
+    const admitDate = new Date(admission.admissionDate);
+    const dischargeDate = new Date();
+    const diffTime = Math.abs(dischargeDate.getTime() - admitDate.getTime());
+    const diffDays = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+    return `${diffDays} Day${diffDays > 1 ? "s" : ""}`;
+  }, [admission?.admissionDate]);
+
   const [diagnosisAtDischarge, setDiagnosisAtDischarge] = React.useState(
-    "Coronary Artery Disease (CAD), Acute Coronary Syndrome (ACS) - Post PCI to LAD, Essential Hypertension"
+    admission?.dischargeSummary?.diagnosisAtDischarge || admission?.admissionReason || ""
   );
   const [courseInHospital, setCourseInHospital] = React.useState(
-    "Patient presented with severe retrosternal chest pain and sweating. Underwent successful Primary Percutaneous Coronary Intervention (PCI) with drug-eluting stent to Proximal LAD. Hemodynamically stable, post-procedure echo shows LVEF 55%. Transferred from ICU to room and now ambulating comfortably."
+    admission?.dischargeSummary?.clinicalCourse ||
+      "Inpatient clinical management, observation, and treatment completed. Patient is hemodynamically stable."
   );
   const [conditionAtDischarge, setConditionAtDischarge] = React.useState(
-    "Hemodynamically stable, afebrile, vitals normal. Surgical puncture site clean and dry."
+    "Hemodynamically stable, afebrile, vitals normal."
   );
   const [dischargeMedications, setDischargeMedications] = React.useState(
-    "1. Tab. Ticagrelor 90mg - 1-0-1 after food (1 year)\n2. Tab. Aspirin 75mg - 0-1-0 after lunch\n3. Tab. Atorvastatin 40mg - 0-0-1 at bedtime\n4. Tab. Metoprolol 25mg - 1-0-0 morning\n5. Tab. Pantoprazole 40mg - 1-0-0 before breakfast"
+    admission?.dischargeSummary?.dischargePrescriptions
+      ?.map((p, idx) => `${idx + 1}. ${p.medicineName} ${p.dosage} - ${p.frequency} (${p.durationDays}d)`)
+      .join("\n") || ""
   );
   const [followUpAdvice, setFollowUpAdvice] = React.useState(
-    "Review in Cardiology OPD after 7 days (or earlier in case of chest discomfort or bleeding). Low salt, cardiac diet."
+    admission?.dischargeSummary?.followUpInstructions ||
+      "Review in OPD after 7 days or immediately in case of discomfort."
   );
+
+  React.useEffect(() => {
+    if (open && admission) {
+      setDiagnosisAtDischarge(
+        admission.dischargeSummary?.diagnosisAtDischarge || admission.admissionReason || ""
+      );
+      setCourseInHospital(
+        admission.dischargeSummary?.clinicalCourse ||
+          "Inpatient clinical management, observation, and treatment completed. Patient is hemodynamically stable."
+      );
+      setConditionAtDischarge("Hemodynamically stable, afebrile, vitals normal.");
+      setDischargeMedications(
+        admission.dischargeSummary?.dischargePrescriptions
+          ?.map((p, idx) => `${idx + 1}. ${p.medicineName} ${p.dosage} - ${p.frequency} (${p.durationDays}d)`)
+          .join("\n") || ""
+      );
+      setFollowUpAdvice(
+        admission.dischargeSummary?.followUpInstructions ||
+          "Review in OPD after 7 days or immediately in case of discomfort."
+      );
+    }
+  }, [open, admission]);
 
   const handlePrint = () => {
     window.print();
@@ -96,14 +145,14 @@ export function DischargeSummaryModal({
           {/* Admission Demographics */}
           <div className="grid grid-cols-2 gap-3 p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs">
             <div>
-              <div><span className="text-slate-500">Patient:</span> <span className="font-bold text-slate-900">{patientName}</span></div>
+              <div><span className="text-slate-500">Patient:</span> <span className="font-bold text-slate-900">{resolvedPatientName}</span></div>
               <div><span className="text-slate-500">Admission No:</span> <span className="font-mono font-semibold">{admission.admissionNumber}</span></div>
               <div><span className="text-slate-500">Admit Date:</span> <span className="font-semibold">{formatClinicalDate(admission.admissionDate)}</span></div>
             </div>
             <div className="text-right">
-              <div><span className="text-slate-500">Primary Consultant:</span> <span className="font-bold text-slate-900">Dr. Gaurav Kumar (DM Cardio)</span></div>
+              <div><span className="text-slate-500">Primary Consultant:</span> <span className="font-bold text-slate-900">{resolvedDoctorName}</span></div>
               <div><span className="text-slate-500">Discharge Date:</span> <span className="font-semibold">{formatClinicalDate(new Date().toISOString().slice(0, 10))}</span></div>
-              <div><span className="text-slate-500">Length of Stay:</span> <span className="font-semibold">3 Days</span></div>
+              <div><span className="text-slate-500">Length of Stay:</span> <span className="font-semibold">{lengthOfStay}</span></div>
             </div>
           </div>
 
@@ -168,7 +217,7 @@ export function DischargeSummaryModal({
               ABDM Care Context Linked (FHIR R4 Composition). Valid clinical discharge summary.
             </div>
             <div className="text-center w-52">
-              <div className="font-serif italic text-sm text-slate-800">Dr. Gaurav Kumar</div>
+              <div className="font-serif italic text-sm text-slate-800">{resolvedDoctorName}</div>
               <div className="border-t border-slate-400 mt-1 pt-1 font-bold text-[11px] text-slate-900">
                 Attending Consultant Signature
               </div>

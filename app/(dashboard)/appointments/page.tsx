@@ -44,15 +44,25 @@ import { AppointmentBookingModal } from "@/components/appointments/AppointmentBo
 import { PrintDayScheduleModal } from "@/components/appointments/PrintDayScheduleModal";
 import { AppointmentDetailsPopover } from "@/components/appointments/AppointmentDetailsPopover";
 
-const DOCTORS = [
-  { id: "all", name: "All Doctors & Clinics" },
-  { id: "doc-1", name: "Dr. Gaurav Kumar (Cardiology)" },
-  { id: "doc-2", name: "Dr. Ananya Sharma (General Med)" },
-  { id: "doc-3", name: "Dr. Rajesh Varma (Orthopedics)" },
-];
-
 export default function AppointmentsPage() {
   const store = useClinicalStore();
+
+  const doctorList = React.useMemo(() => {
+    const docs = store.staff.filter(
+      (s) =>
+        s.role === "doctor" ||
+        s.role.includes("doctor") ||
+        s.role.includes("consultant") ||
+        s.role.includes("specialist")
+    );
+    return [
+      { id: "all", name: "All Doctors & Clinics" },
+      ...docs.map((d) => ({
+        id: d.id,
+        name: `${d.name} (${d.department})`,
+      })),
+    ];
+  }, [store.staff]);
 
   // Calendar Navigation State (Default to Nov 14, 2026 to match screenshot)
   const [selectedDate, setSelectedDate] = React.useState<string>("2026-11-14");
@@ -249,10 +259,11 @@ export default function AppointmentsPage() {
               onChange={(e) => setSelectedDoctorId(e.target.value)}
               className="appearance-none px-3.5 py-1.5 pr-7 rounded-full border border-white/70 bg-[#1565C0] text-white font-medium text-xs hover:bg-[#0D47A1] transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-white/50"
             >
-              <option value="all">All, Visual Eyez, Dr. Gaurav Kumar...</option>
-              <option value="doc-1">Dr. Gaurav Kumar (Cardiology)</option>
-              <option value="doc-2">Dr. Ananya Sharma (General Med)</option>
-              <option value="doc-3">Dr. Rajesh Varma (Orthopedics)</option>
+              {doctorList.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
             </select>
             <ChevronRight className="h-3 w-3 text-white absolute right-2.5 top-2.5 rotate-90 pointer-events-none" />
           </div>
@@ -380,7 +391,7 @@ export default function AppointmentsPage() {
             onChange={(e) => setSelectedDoctorId(e.target.value)}
             className="h-8 rounded-md border border-slate-200 bg-white px-2.5 text-xs text-slate-700 font-medium focus:outline-none focus:ring-1 focus:ring-blue-500"
           >
-            {DOCTORS.map((d) => (
+            {doctorList.map((d) => (
               <option key={d.id} value={d.id}>
                 {d.name}
               </option>

@@ -1,4 +1,4 @@
-import { describe, it } from "node:test";
+import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { clinicalStore } from "../services/clinical-store";
 import { BillingService } from "../services/billing.service";
@@ -11,6 +11,9 @@ import type {
 } from "../types/hms";
 
 describe("OPD Doctor Consultation & Clinical Desk Engine Tests", () => {
+  beforeEach(() => {
+    clinicalStore.seedDemoData();
+  });
   describe("Screenshot Queue & Patient Verification", () => {
     it("should find all 5 seeded patients from the Healthray screenshot", () => {
       const appointments = clinicalStore.getSnapshot().appointments;

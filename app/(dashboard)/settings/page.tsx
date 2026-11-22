@@ -27,6 +27,10 @@ import { formatCurrencyINR } from "@/utils/formatting";
 export default function SettingsPage() {
   const store = useClinicalStore();
   const settings = store.settings;
+  const sampleDoctor = store.staff.find((s) => s.role.includes("doctor") || s.role.includes("consultant")) || {
+    name: "Consulting Physician",
+    license: "MCI-VALIDATED",
+  };
 
   // Branch Profile & GSTIN
   const [hospitalName, setHospitalName] = React.useState(settings.hospitalName);
@@ -290,8 +294,8 @@ export default function SettingsPage() {
 
                   {showDoctorCredentials && (
                     <div className="text-right">
-                      <div className="font-bold text-slate-800">Dr. Gaurav Kumar, MD, DM</div>
-                      <div className="text-[9px] text-slate-400">Reg No: MCI-2015-48291</div>
+                      <div className="font-bold text-slate-800">{sampleDoctor.name}</div>
+                      <div className="text-[9px] text-slate-400">Reg No: {sampleDoctor.license || "MCI-VALIDATED"}</div>
                     </div>
                   )}
                 </div>

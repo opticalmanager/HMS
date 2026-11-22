@@ -28,8 +28,8 @@ export default function LandingPage() {
   const router = useRouter();
 
   // Login form state
-  const [loginEmail, setLoginEmail] = React.useState("dr.gaurav@apexhospital.org");
-  const [loginPassword, setLoginPassword] = React.useState("Hospital@2026");
+  const [loginEmail, setLoginEmail] = React.useState("");
+  const [loginPassword, setLoginPassword] = React.useState("");
   const [loginLoading, setLoginLoading] = React.useState(false);
   const [loginError, setLoginError] = React.useState<string | null>(null);
 

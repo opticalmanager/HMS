@@ -22,45 +22,24 @@ export function TokenDisplayScreen() {
   const [isMuted, setIsMuted] = React.useState(false);
   const [lastChimedToken, setLastChimedToken] = React.useState<number | null>(null);
 
-  // Active cabin slots
-  const [cabins, setCabins] = React.useState<CabinToken[]>([
-    {
-      room: "OPD Room 1",
-      doctor: "Dr. Gaurav Kumar",
-      department: "Cardiology",
-      token: 104,
-      patientName: "Ramesh Patel",
-      status: "calling",
-    },
-    {
-      room: "OPD Room 2",
-      doctor: "Dr. Ananya Sharma",
-      department: "General Medicine",
-      token: 105,
-      patientName: "Sunita Roy",
-      status: "in_room",
-    },
-    {
-      room: "OPD Room 3",
-      doctor: "Dr. Rajesh Varma",
-      department: "Orthopedics",
-      token: 106,
-      patientName: "Vikram Singh",
-      status: "in_room",
-    },
-    {
-      room: "Diagnostic Lab",
-      doctor: "Lab Counter A",
-      department: "Pathology & Blood Draw",
-      token: 107,
-      patientName: "Pooja Mehta",
-      status: "calling",
-    },
-  ]);
+  // Compute active cabins dynamically from store
+  const dynamicCabins: CabinToken[] = React.useMemo(() => {
+    const active = store.appointments.filter(
+      (a) => a.status === "in_consultation" || a.status === "arrived"
+    );
+    return active.map((a, idx) => ({
+      room: `OPD Room ${idx + 1}`,
+      doctor: a.doctorName || "Consultant",
+      department: a.department || "General OPD",
+      token: a.tokenNumber,
+      patientName: a.patientName || "Patient",
+      status: a.status === "arrived" ? ("calling" as const) : ("in_room" as const),
+    }));
+  }, [store.appointments]);
 
   // Upcoming queue tokens from store
   const upcomingTokens = store.appointments
-    .filter((a) => a.status === "scheduled" || a.status === "arrived")
+    .filter((a) => a.status === "scheduled")
     .map((a) => a.tokenNumber);
 
   React.useEffect(() => {
@@ -92,36 +71,22 @@ export function TokenDisplayScreen() {
 
   // Call token for a specific cabin with audio chime & store synchronization
   const handleCallToken = (cabinIdx: number) => {
-    // Find next waiting appointment in store
-    const nextWaiting = store.appointments.find(
-      (a) => a.status === "scheduled" || a.status === "arrived"
-    );
-
-    let nextToken = cabins[cabinIdx].token + 1;
-    let nextPatient = "Walk-in Patient";
+    const targetCabin = dynamicCabins[cabinIdx];
+    // Find next waiting appointment for this doctor/cabin or next general waiting
+    const nextWaiting =
+      store.appointments.find(
+        (a) =>
+          (a.status === "scheduled" || a.status === "arrived") &&
+          (targetCabin ? a.doctorName === targetCabin.doctor || a.department === targetCabin.department : true)
+      ) || store.appointments.find((a) => a.status === "scheduled" || a.status === "arrived");
 
     if (nextWaiting) {
-      nextToken = nextWaiting.tokenNumber;
-      nextPatient = nextWaiting.patientName || "Waiting Patient";
       // Transition waiting appointment to in_consultation
       clinicalStore.updateAppointmentStatus(nextWaiting.id, "in_consultation");
+      setLastChimedToken(nextWaiting.tokenNumber);
     }
 
     audioChime.playChime(0.7);
-
-    setCabins((prev) =>
-      prev.map((c, i) =>
-        i === cabinIdx
-          ? {
-              ...c,
-              token: nextToken,
-              patientName: nextPatient,
-              status: "calling",
-            }
-          : c
-      )
-    );
-    setLastChimedToken(nextToken);
   };
 
   return (
@@ -173,64 +138,76 @@ export function TokenDisplayScreen() {
       </header>
 
       {/* Main Calling Cabin Grid */}
-      <main className="flex-1 p-8 grid grid-cols-1 md:grid-cols-2 gap-6">
-        {cabins.map((item, idx) => {
-          const isCalling = item.status === "calling";
-          return (
-            <div
-              key={item.room}
-              className={`rounded-2xl border-2 p-6 flex flex-col justify-between transition-all relative ${
-                isCalling
-                  ? "border-[#2563EB] bg-blue-950/40 shadow-2xl shadow-blue-500/20 ring-2 ring-blue-500/30"
-                  : "border-slate-800 bg-slate-900/60"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="px-3.5 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider bg-slate-800 text-slate-200 border border-slate-700">
-                  {item.room}
-                </span>
-
-                <div className="flex items-center gap-2">
-                  {isCalling && (
-                    <span className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse">
-                      <Volume2 className="h-4 w-4 animate-bounce" /> Now Calling
+      <main className="flex-1 p-8">
+        {dynamicCabins.length === 0 ? (
+          <div className="h-full min-h-[380px] flex flex-col items-center justify-center p-12 text-center rounded-2xl border-2 border-dashed border-slate-800 bg-slate-900/40">
+            <Users className="h-16 w-16 text-slate-600 mb-4 animate-pulse" />
+            <h2 className="text-2xl font-bold text-slate-300">Queue Idle / Waiting for Next Patient</h2>
+            <p className="text-sm text-slate-500 max-w-md mt-2">
+              All consultations are currently cleared or waiting for patients to arrive. Newly checked-in tokens will appear here automatically.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {dynamicCabins.map((item, idx) => {
+              const isCalling = item.status === "calling";
+              return (
+                <div
+                  key={`${item.room}-${item.token}`}
+                  className={`rounded-2xl border-2 p-6 flex flex-col justify-between transition-all relative ${
+                    isCalling
+                      ? "border-[#2563EB] bg-blue-950/40 shadow-2xl shadow-blue-500/20 ring-2 ring-blue-500/30"
+                      : "border-slate-800 bg-slate-900/60"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="px-3.5 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider bg-slate-800 text-slate-200 border border-slate-700">
+                      {item.room}
                     </span>
-                  )}
-                  {/* Doctor Desk Recall Trigger */}
-                  <button
-                    type="button"
-                    onClick={() => handleCallToken(idx)}
-                    title="Advance to next token"
-                    className="p-1.5 rounded-lg bg-slate-800 hover:bg-blue-600 text-slate-300 hover:text-white transition-colors text-xs flex items-center gap-1"
-                  >
-                    <Play className="h-3.5 w-3.5" /> Next Token
-                  </button>
-                </div>
-              </div>
 
-              {/* Big Token Number for TV Legibility */}
-              <div className="my-6 text-center">
-                <div className="text-xs uppercase font-bold text-slate-400 tracking-widest mb-1">
-                  Token Number
-                </div>
-                <div className="text-8xl font-black font-mono tracking-tighter text-white drop-shadow-md">
-                  #{item.token}
-                </div>
-              </div>
+                    <div className="flex items-center gap-2">
+                      {isCalling && (
+                        <span className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse">
+                          <Volume2 className="h-4 w-4 animate-bounce" /> Now Calling
+                        </span>
+                      )}
+                      {/* Doctor Desk Recall Trigger */}
+                      <button
+                        type="button"
+                        onClick={() => handleCallToken(idx)}
+                        title="Advance to next token"
+                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-blue-600 text-slate-300 hover:text-white transition-colors text-xs flex items-center gap-1"
+                      >
+                        <Play className="h-3.5 w-3.5" /> Next Token
+                      </button>
+                    </div>
+                  </div>
 
-              <div className="pt-4 border-t border-slate-800/80 flex items-center justify-between">
-                <div>
-                  <div className="text-lg font-bold text-white">{item.doctor}</div>
-                  <div className="text-xs text-blue-400 font-semibold">{item.department}</div>
+                  {/* Big Token Number for TV Legibility */}
+                  <div className="my-6 text-center">
+                    <div className="text-xs uppercase font-bold text-slate-400 tracking-widest mb-1">
+                      Token Number
+                    </div>
+                    <div className="text-8xl font-black font-mono tracking-tighter text-white drop-shadow-md">
+                      #{item.token}
+                    </div>
+                  </div>
+
+                  <div className="pt-4 border-t border-slate-800/80 flex items-center justify-between">
+                    <div>
+                      <div className="text-lg font-bold text-white">{item.doctor}</div>
+                      <div className="text-xs text-blue-400 font-semibold">{item.department}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xs text-slate-400 font-medium">Patient</div>
+                      <div className="text-sm font-bold text-slate-200">{item.patientName}</div>
+                    </div>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <div className="text-xs text-slate-400 font-medium">Patient</div>
-                  <div className="text-sm font-bold text-slate-200">{item.patientName}</div>
-                </div>
-              </div>
-            </div>
-          );
-        })}
+              );
+            })}
+          </div>
+        )}
       </main>
 
       {/* Footer Next Waiting Ticker */}
@@ -247,7 +224,7 @@ export function TokenDisplayScreen() {
                 </React.Fragment>
               ))
             ) : (
-              <span>#108 • #109 • #110 • #111 • #112</span>
+              <span className="text-slate-500 font-sans font-normal text-xs">Queue Idle / Waiting for Next Patient</span>
             )}
           </div>
         </div>

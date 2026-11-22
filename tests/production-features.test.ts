@@ -1,4 +1,4 @@
-import { test, describe } from "node:test";
+import { test, describe, before, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { parseDoseFrequency } from "../utils/dose-parser";
 import { audioChime } from "../utils/audio-chime";
@@ -111,6 +111,10 @@ describe("Audio Chime Synthesizer Resilience", () => {
 });
 
 describe("16 Clinical & Financial Reports Engine", () => {
+  beforeEach(() => {
+    clinicalStore.seedDemoData();
+  });
+
   test("contains all 16 reports in catalog", () => {
     assert.equal(REPORTS_CATALOG.length, 16);
     const ids = REPORTS_CATALOG.map((r) => r.id);
@@ -151,6 +155,10 @@ describe("16 Clinical & Financial Reports Engine", () => {
 });
 
 describe("Clinical Store Reactive State & Workflows", () => {
+  beforeEach(() => {
+    clinicalStore.seedDemoData();
+  });
+
   test("adds patient and persists in store", () => {
     const initialCount = clinicalStore.getSnapshot().patients.length;
     clinicalStore.addPatient({

@@ -35,16 +35,6 @@ import {
   CartesianGrid,
 } from "recharts";
 
-const REVENUE_DATA = [
-  { day: "Mon", revenue: 112000, footfall: 38 },
-  { day: "Tue", revenue: 135000, footfall: 44 },
-  { day: "Wed", revenue: 128000, footfall: 41 },
-  { day: "Thu", revenue: 148500, footfall: 49 },
-  { day: "Fri", revenue: 162000, footfall: 56 },
-  { day: "Sat", revenue: 174000, footfall: 62 },
-  { day: "Sun", revenue: 98000, footfall: 32 },
-];
-
 export default function DashboardPage() {
   const store = useClinicalStore();
   const [selectedKpi, setSelectedKpi] = React.useState<string>("all");
@@ -55,6 +45,84 @@ export default function DashboardPage() {
   const totalBeds = store.beds.length;
   const occupancyPercent = totalBeds > 0 ? Math.round((occupiedBeds.length / totalBeds) * 100) : 0;
   const totalBilling = store.invoices.reduce((sum, inv) => sum + inv.grandTotal, 0);
+
+  // Dynamic 7-day revenue & footfall calculation from store
+  const revenueData = React.useMemo(() => {
+    const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const allDates = [
+      ...store.invoices.map((inv) => inv.createdAt?.slice(0, 10)),
+      ...store.appointments.map((apt) => apt.appointmentDate || apt.createdAt?.slice(0, 10)),
+    ].filter(Boolean) as string[];
+
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const anchorStr =
+      allDates.length > 0
+        ? allDates.includes(todayStr)
+          ? todayStr
+          : allDates.sort().slice(-1)[0]
+        : todayStr;
+
+    const anchor = new Date(anchorStr);
+    const result: Array<{ day: string; revenue: number; footfall: number }> = [];
+
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(anchor);
+      d.setDate(anchor.getDate() - i);
+      const dateStr = d.toISOString().slice(0, 10);
+      const dayLabel = days[d.getDay()];
+
+      const dayRevenue = store.invoices
+        .filter((inv) => inv.createdAt?.startsWith(dateStr))
+        .reduce((sum, inv) => sum + (inv.grandTotal || 0), 0);
+
+      const dayFootfall = store.appointments
+        .filter((apt) => (apt.appointmentDate || apt.createdAt?.slice(0, 10)) === dateStr)
+        .length;
+
+      result.push({
+        day: dayLabel,
+        revenue: dayRevenue,
+        footfall: dayFootfall,
+      });
+    }
+    return result;
+  }, [store.invoices, store.appointments]);
+
+  // Dynamic doctor productivity aggregation from store
+  const doctorsProductivity = React.useMemo(() => {
+    const doctors = store.staff.filter(
+      (s) =>
+        s.role === "doctor" ||
+        s.role.includes("doctor") ||
+        s.role.includes("consultant") ||
+        s.role.includes("specialist")
+    );
+
+    return doctors.map((doc) => {
+      const docAppointments = store.appointments.filter(
+        (a) => a.doctorId === doc.id || a.doctorName?.toLowerCase() === doc.name.toLowerCase()
+      );
+      const consultCount = docAppointments.length;
+      const revenue = docAppointments.reduce((sum, a) => sum + (a.consultationFee || 0), 0);
+      const ipdRounds = (store.admissions || []).filter(
+        (adm) =>
+          adm.primaryDoctorId === doc.id ||
+          adm.primaryDoctorId === doc.name ||
+          (doc.id === "usr-1" && adm.primaryDoctorId === "doc-1")
+      ).length;
+
+      return {
+        id: doc.id,
+        name: doc.name,
+        dept: doc.department || "General",
+        todayConsults: consultCount,
+        avgConsultMins: consultCount > 0 ? "10.5m" : "0m",
+        ipdRounds,
+        revenueGenerated: revenue,
+        rating: "4.9 ★",
+      };
+    });
+  }, [store.staff, store.appointments, store.admissions]);
 
   const KPIS = [
     {
@@ -88,40 +156,6 @@ export default function DashboardPage() {
       sub: `${store.invoices.length} invoices generated`,
       icon: Receipt,
       color: "text-indigo-600 bg-indigo-50",
-    },
-  ];
-
-  // Doctor productivity metrics
-  const DOCTORS_PRODUCTIVITY = [
-    {
-      id: "doc-1",
-      name: "Dr. Gaurav Kumar",
-      dept: "Cardiology",
-      todayConsults: 14,
-      avgConsultMins: "10.5m",
-      ipdRounds: 4,
-      revenueGenerated: 28400,
-      rating: "4.9 ★",
-    },
-    {
-      id: "doc-2",
-      name: "Dr. Ananya Sharma",
-      dept: "General Medicine",
-      todayConsults: 18,
-      avgConsultMins: "8.2m",
-      ipdRounds: 6,
-      revenueGenerated: 19500,
-      rating: "4.8 ★",
-    },
-    {
-      id: "doc-3",
-      name: "Dr. Rajesh Varma",
-      dept: "Orthopedics",
-      todayConsults: 11,
-      avgConsultMins: "14.0m",
-      ipdRounds: 3,
-      revenueGenerated: 34200,
-      rating: "4.9 ★",
     },
   ];
 
@@ -213,7 +247,7 @@ export default function DashboardPage() {
           <CardContent>
             <div className="h-64 w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={REVENUE_DATA} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <AreaChart data={revenueData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#2563EB" stopOpacity={0.25} />
@@ -257,7 +291,7 @@ export default function DashboardPage() {
           <CardContent>
             <div className="h-64 w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={REVENUE_DATA} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <BarChart data={revenueData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                   <XAxis dataKey="day" tick={{ fontSize: 11, fill: "#64748b" }} />
                   <YAxis tick={{ fontSize: 11, fill: "#64748b" }} />
@@ -400,34 +434,38 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent className="p-0">
               <div className="divide-y divide-slate-100 text-xs">
-                {DOCTORS_PRODUCTIVITY.map((doc) => (
-                  <div key={doc.id} className="p-3.5 space-y-2 hover:bg-slate-50">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="font-semibold text-slate-900">{doc.name}</div>
-                        <div className="text-[11px] text-slate-500">{doc.dept}</div>
+                {doctorsProductivity.length === 0 ? (
+                  <div className="p-4 text-center text-slate-400 text-xs">No doctors registered yet</div>
+                ) : (
+                  doctorsProductivity.map((doc) => (
+                    <div key={doc.id} className="p-3.5 space-y-2 hover:bg-slate-50">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="font-semibold text-slate-900">{doc.name}</div>
+                          <div className="text-[11px] text-slate-500">{doc.dept}</div>
+                        </div>
+                        <Badge variant="outline" className="bg-amber-50 text-amber-700 font-semibold border-amber-200">
+                          {doc.rating}
+                        </Badge>
                       </div>
-                      <Badge variant="outline" className="bg-amber-50 text-amber-700 font-semibold border-amber-200">
-                        {doc.rating}
-                      </Badge>
-                    </div>
 
-                    <div className="grid grid-cols-3 gap-2 pt-1 border-t border-slate-100 text-[11px]">
-                      <div>
-                        <span className="text-slate-400 block">Consults</span>
-                        <span className="font-bold text-slate-900">{doc.todayConsults} pts</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-400 block">Avg Pace</span>
-                        <span className="font-bold text-slate-900">{doc.avgConsultMins}</span>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-slate-400 block">Revenue</span>
-                        <span className="font-bold text-emerald-600">{formatCurrencyINR(doc.revenueGenerated)}</span>
+                      <div className="grid grid-cols-3 gap-2 pt-1 border-t border-slate-100 text-[11px]">
+                        <div>
+                          <span className="text-slate-400 block">Consults</span>
+                          <span className="font-bold text-slate-900">{doc.todayConsults} pts</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block">Avg Pace</span>
+                          <span className="font-bold text-slate-900">{doc.avgConsultMins}</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-slate-400 block">Revenue</span>
+                          <span className="font-bold text-emerald-600">{formatCurrencyINR(doc.revenueGenerated)}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </CardContent>
           </Card>

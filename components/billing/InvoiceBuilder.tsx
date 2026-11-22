@@ -13,6 +13,7 @@ import { ThermalReceiptModal } from "@/components/billing/ThermalReceiptModal";
 import type { InvoiceItem, Invoice, PaymentMode } from "@/types/hms";
 
 interface InvoiceBuilderProps {
+  patientId?: string;
   patientName?: string;
   patientPhone?: string;
   uhid?: string;
@@ -20,18 +21,20 @@ interface InvoiceBuilderProps {
 }
 
 export function InvoiceBuilder({
-  patientName = "Ramesh Patel",
-  patientPhone = "9823012345",
-  uhid = "UHID-2026-0041",
+  patientId = "",
+  patientName = "",
+  patientPhone = "",
+  uhid = "",
   onInvoiceCreated,
 }: InvoiceBuilderProps) {
   const store = useClinicalStore();
 
+  const [currentPatientId, setCurrentPatientId] = React.useState(patientId);
   const [currentPatientName, setCurrentPatientName] = React.useState(patientName);
   const [currentPatientPhone, setCurrentPatientPhone] = React.useState(patientPhone);
   const [currentUhid, setCurrentUhid] = React.useState(uhid);
   const [patientSearch, setPatientSearch] = React.useState("");
-  const [showPatientSearch, setShowPatientSearch] = React.useState(false);
+  const [showPatientSearch, setShowPatientSearch] = React.useState(!patientName);
 
   const patientSuggestions = React.useMemo(() => {
     if (!patientSearch.trim()) return [];
@@ -45,6 +48,7 @@ export function InvoiceBuilder({
   }, [patientSearch, store.patients]);
 
   const selectPatient = (p: typeof store.patients[0]) => {
+    setCurrentPatientId(p.id);
     setCurrentPatientName(p.fullName);
     setCurrentPatientPhone(p.phone);
     setCurrentUhid(p.uhid);
@@ -52,24 +56,7 @@ export function InvoiceBuilder({
     setShowPatientSearch(false);
   };
 
-  const [items, setItems] = React.useState<InvoiceItem[]>([
-    {
-      description: "Specialist OPD Consultation",
-      category: "consultation",
-      quantity: 1,
-      unitPrice: 800,
-      gstRate: 0,
-      amount: 800,
-    },
-    {
-      description: "Complete Blood Count (CBC) with ESR",
-      category: "lab_test",
-      quantity: 1,
-      unitPrice: 450,
-      gstRate: 0,
-      amount: 450,
-    },
-  ]);
+  const [items, setItems] = React.useState<InvoiceItem[]>([]);
 
   const [newItem, setNewItem] = React.useState<InvoiceItem>({
     description: "",
@@ -175,9 +162,9 @@ export function InvoiceBuilder({
       invoiceNumber: invNumber,
       organizationId: "org-apex-001",
       branchId: "br-main-001",
-      patientId: "pat-1",
-      patientName: currentPatientName,
-      patientPhone: currentPatientPhone,
+      patientId: currentPatientId || "pat-walkin",
+      patientName: currentPatientName || "Walk-in Patient",
+      patientPhone: currentPatientPhone || "",
       invoiceType: "opd",
       items,
       subtotal: totals.subtotal,
@@ -234,7 +221,7 @@ export function InvoiceBuilder({
                 />
               </div>
 
-              {patientSuggestions.length > 0 && (
+              {patientSuggestions.length > 0 ? (
                 <div className="absolute top-full left-0 right-0 z-30 mt-1 max-h-48 overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg p-1 divide-y divide-slate-100">
                   {patientSuggestions.map((p) => (
                     <button
@@ -251,14 +238,40 @@ export function InvoiceBuilder({
                     </button>
                   ))}
                 </div>
-              )}
+              ) : patientSearch.trim().length > 0 ? (
+                <div className="absolute top-full left-0 right-0 z-30 mt-1 rounded-lg border border-slate-200 bg-white shadow-lg p-2">
+                  <div className="text-[11px] text-slate-500 mb-1">No registered patient matched.</div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCurrentPatientId(`pat-walkin-${Date.now().toString(36)}`);
+                      setCurrentPatientName(patientSearch.trim());
+                      setCurrentPatientPhone("");
+                      setCurrentUhid("WALK-IN");
+                      setShowPatientSearch(false);
+                    }}
+                    className="w-full text-left px-2.5 py-1.5 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 font-medium text-xs flex items-center justify-between transition-colors"
+                  >
+                    <span>Use &quot;{patientSearch.trim()}&quot; as Walk-in Patient</span>
+                    <span className="text-[10px] uppercase font-bold text-blue-600">Walk-in</span>
+                  </button>
+                </div>
+              ) : null}
             </div>
           ) : (
             <div className="mt-1">
-              <div className="text-base font-bold text-slate-900">{currentPatientName}</div>
-              <div className="text-xs text-slate-500 font-mono">
-                UHID: {currentUhid} | Mobile: {currentPatientPhone}
-              </div>
+              {currentPatientName ? (
+                <>
+                  <div className="text-base font-bold text-slate-900">{currentPatientName}</div>
+                  <div className="text-xs text-slate-500 font-mono">
+                    UHID: {currentUhid || "—"} | Mobile: {currentPatientPhone || "—"}
+                  </div>
+                </>
+              ) : (
+                <div className="text-xs text-slate-400 italic">
+                  No patient selected. Click &quot;Change Patient&quot; above to search or assign.
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -403,27 +416,35 @@ export function InvoiceBuilder({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {items.map((item, idx) => (
-              <TableRow key={idx}>
-                <TableCell className="font-semibold text-slate-900 text-xs">{item.description}</TableCell>
-                <TableCell className="capitalize text-slate-500 text-xs">{item.category}</TableCell>
-                <TableCell className="text-right text-xs font-mono">{item.quantity}</TableCell>
-                <TableCell className="text-right text-xs font-mono">{formatCurrencyINR(item.unitPrice)}</TableCell>
-                <TableCell className="text-right text-xs font-mono">{item.gstRate}%</TableCell>
-                <TableCell className="text-right font-bold text-slate-900 text-xs">
-                  {formatCurrencyINR(item.amount)}
-                </TableCell>
-                <TableCell className="text-center">
-                  <button
-                    type="button"
-                    onClick={() => removeItem(idx)}
-                    className="text-slate-400 hover:text-red-600 transition-colors"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+            {items.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center py-6 text-slate-400 text-xs">
+                  No billable items added yet. Pick from catalog or add a service charge above.
                 </TableCell>
               </TableRow>
-            ))}
+            ) : (
+              items.map((item, idx) => (
+                <TableRow key={idx}>
+                  <TableCell className="font-semibold text-slate-900 text-xs">{item.description}</TableCell>
+                  <TableCell className="capitalize text-slate-500 text-xs">{item.category}</TableCell>
+                  <TableCell className="text-right text-xs font-mono">{item.quantity}</TableCell>
+                  <TableCell className="text-right text-xs font-mono">{formatCurrencyINR(item.unitPrice)}</TableCell>
+                  <TableCell className="text-right text-xs font-mono">{item.gstRate}%</TableCell>
+                  <TableCell className="text-right font-bold text-slate-900 text-xs">
+                    {formatCurrencyINR(item.amount)}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <button
+                      type="button"
+                      onClick={() => removeItem(idx)}
+                      className="text-slate-400 hover:text-red-600 transition-colors"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
 
