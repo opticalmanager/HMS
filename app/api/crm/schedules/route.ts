@@ -141,3 +141,47 @@ export async function PUT(request: NextRequest) {
     return handleAuthError(error);
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const { clinicId, role, user } = await requireClinicSession(
+      { schedule: ["manage_own"] },
+      { headers: request.headers, redirectIfUnauthorized: false }
+    );
+
+    const { searchParams } = new URL(request.url);
+    const scheduleId = searchParams.get("id");
+
+    if (!scheduleId) {
+      return NextResponse.json(
+        { success: false, error: "Schedule ID ('id' query param) is required" },
+        { status: 400 }
+      );
+    }
+
+    const existingSchedule = await ScheduleService.getScheduleById(clinicId, scheduleId);
+    if (!existingSchedule) {
+      return NextResponse.json(
+        { success: false, error: "Schedule not found" },
+        { status: 404 }
+      );
+    }
+
+    // RBAC: Doctor gets 403 when deleting another doctor's schedule
+    if (role === "doctor") {
+      const ownDoctor = await DoctorService.getDoctorByUserId(clinicId, user.id);
+      if (!ownDoctor || ownDoctor.id !== existingSchedule.doctorId) {
+        throw new ForbiddenError("Doctors may only delete their own clinical schedules");
+      }
+    }
+
+    await ScheduleService.deleteSchedule(clinicId, scheduleId);
+
+    return NextResponse.json({
+      success: true,
+      message: "Schedule removed successfully",
+    });
+  } catch (error) {
+    return handleAuthError(error);
+  }
+}

@@ -161,10 +161,12 @@ CREATE TABLE IF NOT EXISTS "ai_audit_logs" (
   "estimated_cost_usd" numeric(10, 6) DEFAULT '0.000000',
   "status" text NOT NULL,
   "error_code" text,
-  "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+  "updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 CREATE INDEX IF NOT EXISTS "ai_audit_logs_organization_id_idx" ON "ai_audit_logs"("organization_id");
 CREATE INDEX IF NOT EXISTS "ai_audit_logs_trace_id_idx" ON "ai_audit_logs"("trace_id");
+ALTER TABLE "ai_audit_logs" ADD COLUMN IF NOT EXISTS "updated_at" timestamp with time zone DEFAULT now() NOT NULL;
 
 -- 9. Alter Existing Tables (patients, appointments, invoices)
 ALTER TABLE "patients" ADD COLUMN IF NOT EXISTS "phone_e164" text;

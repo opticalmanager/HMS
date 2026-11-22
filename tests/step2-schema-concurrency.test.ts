@@ -11,6 +11,7 @@ import {
   medicineMaster,
   serviceTariffs,
   doctorSchedules,
+  doctorSlotBlocks,
 } from "../db/schema";
 import { normalizePhoneE164 } from "../lib/phone";
 import { encryptBroadcastApiKey, decryptBroadcastApiKey } from "../lib/crypto";
@@ -27,6 +28,13 @@ import {
   ForbiddenError,
   UnauthorizedError,
 } from "../lib/auth-guard";
+import {
+  AppointmentDomainService,
+  SlotConflictError,
+  SlotBlockedError,
+} from "../services/domain/appointment-service";
+import { ScheduleService } from "../services/domain/schedule-service";
+import { createDoctorSchema } from "../lib/validations/master-data";
 
 describe("Step 2: Core Schema, Concurrency Locks & Master Data Test Suite", () => {
   // -------------------------------------------------------------
@@ -355,6 +363,156 @@ describe("Step 2: Core Schema, Concurrency Locks & Master Data Test Suite", () =
       const matchOrgB = await fuzzyMatchMedicines(testOrgBId, "CardioFlow");
       assert.strictEqual(matchOrgB.length, 0, "Org B must return 0 items for Org A's medicine");
     });
+
+    it("Fuzzy Search Resilience: invalid non-UUID organizationId and invalid limits safely return empty array", async () => {
+      // Non-UUID string
+      const nonUuidResult = await fuzzyMatchMedicines("invalid-non-uuid-string", "CardioFlow");
+      assert.deepStrictEqual(nonUuidResult, [], "Non-UUID organizationId must return [] safely");
+
+      const nonUuidTariff = await fuzzyMatchTariffs("invalid-non-uuid-string", "Consultation");
+      assert.deepStrictEqual(nonUuidTariff, [], "Non-UUID organizationId for tariffs must return [] safely");
+
+      // NaN or negative limit should not crash query
+      const safeLimitResult = await fuzzyMatchMedicines(testOrgAId, "CardioFlow", NaN);
+      assert.ok(Array.isArray(safeLimitResult), "NaN limit must fall back to safe default limit without crashing");
+    });
+
+    it("Appointment Domain Service: High-burst concurrency test rejects 9/10 conflicting simultaneous requests", async () => {
+      const burstSlotTime = new Date("2026-12-10T14:00:00Z");
+      const burstSlotEnd = new Date("2026-12-10T14:15:00Z");
+
+      // Fire 10 simultaneous appointment creations for the exact same slot and doctor
+      const promises = Array.from({ length: 10 }, (_, i) =>
+        AppointmentDomainService.createAppointment(testOrgAId, {
+          patientId: testPatientId,
+          doctorId: testDoctorId,
+          department: "General Surgery",
+          appointmentDate: "2026-12-10",
+          timeSlot: "14:00",
+          slotStart: burstSlotTime,
+          slotEnd: burstSlotEnd,
+          tokenNumber: 300 + i,
+          source: "WEB",
+        })
+          .then((res) => ({ success: true as const, res, err: null as unknown }))
+          .catch((err: any) => ({ success: false as const, res: null, err }))
+      );
+
+      const results = await Promise.all(promises);
+      const successes = results.filter((r) => r.success);
+      const failures = results.filter((r) => !r.success);
+
+      assert.strictEqual(successes.length, 1, "Exactly one booking must succeed under high concurrency burst");
+      assert.strictEqual(failures.length, 9, "9 simultaneous conflicting requests must be rejected");
+      for (const f of failures) {
+        assert.ok(
+          f.err instanceof SlotConflictError || (f.err as any)?.code === "SLOT_CONFLICT",
+          "Failed requests must throw SlotConflictError (409)"
+        );
+      }
+    });
+
+    it("Appointment Domain Service: Slot Block Detection rejects appointments during doctor leave/breaks", async () => {
+      const blockStart = new Date("2026-12-11T12:00:00Z");
+      const blockEnd = new Date("2026-12-11T13:00:00Z");
+
+      // Register doctor slot block
+      const [block] = await db
+        .insert(doctorSlotBlocks)
+        .values({
+          organizationId: testOrgAId,
+          doctorId: testDoctorId,
+          startAt: blockStart,
+          endAt: blockEnd,
+          reason: "Surgical Grand Rounds",
+          createdVia: "WEB",
+        })
+        .returning();
+
+      assert.ok(block.id);
+
+      // Attempt booking inside blocked window (12:15 to 12:30)
+      let blockedError: any = null;
+      try {
+        await AppointmentDomainService.createAppointment(testOrgAId, {
+          patientId: testPatientId,
+          doctorId: testDoctorId,
+          department: "General Surgery",
+          appointmentDate: "2026-12-11",
+          timeSlot: "12:15",
+          slotStart: new Date("2026-12-11T12:15:00Z"),
+          slotEnd: new Date("2026-12-11T12:30:00Z"),
+          source: "WEB",
+        });
+      } catch (err: any) {
+        blockedError = err;
+      }
+
+      assert.ok(blockedError, "Booking during doctor slot block must be rejected");
+      assert.ok(
+        blockedError instanceof SlotBlockedError || blockedError.code === "SLOT_BLOCKED",
+        "Error must be SlotBlockedError"
+      );
+      assert.ok(
+        blockedError.message.includes("Surgical Grand Rounds"),
+        "Error message must cite the block reason"
+      );
+    });
+
+    it("Appointment Domain Service: Idempotent write replay returns existing appointment with isDuplicate = true", async () => {
+      const uniqueIdemKey = `idem-service-test-${Date.now()}`;
+      const slotTime = new Date("2026-12-12T16:00:00Z");
+
+      const firstCall = await AppointmentDomainService.createAppointment(testOrgAId, {
+        patientId: testPatientId,
+        doctorId: testDoctorId,
+        department: "General Surgery",
+        appointmentDate: "2026-12-12",
+        timeSlot: "16:00",
+        slotStart: slotTime,
+        idempotencyKey: uniqueIdemKey,
+        source: "WHATSAPP",
+      });
+
+      assert.strictEqual(firstCall.isDuplicate, false);
+      assert.ok(firstCall.appointment.id);
+
+      // Retry identical call with same idempotencyKey
+      const retryCall = await AppointmentDomainService.createAppointment(testOrgAId, {
+        patientId: testPatientId,
+        doctorId: testDoctorId,
+        department: "General Surgery",
+        appointmentDate: "2026-12-12",
+        timeSlot: "16:00",
+        slotStart: slotTime,
+        idempotencyKey: uniqueIdemKey,
+        source: "WHATSAPP",
+      });
+
+      assert.strictEqual(retryCall.isDuplicate, true, "Retry must be identified as duplicate replay");
+      assert.strictEqual(retryCall.appointment.id, firstCall.appointment.id, "Returned appointment must match first call");
+    });
+
+    it("ScheduleService: supports deleting recurring weekly schedules", async () => {
+      // Create a test schedule in Org A
+      const sched = await ScheduleService.createSchedule(testOrgAId, {
+        doctorId: testDoctorId,
+        dayOfWeek: 2,
+        startTime: "14:00",
+        endTime: "16:00",
+        slotDurationMins: 15,
+      });
+
+      assert.ok(sched.id);
+
+      // Verify deletion
+      const deleted = await ScheduleService.deleteSchedule(testOrgAId, sched.id);
+      assert.strictEqual(deleted, true);
+
+      // Verify it is gone
+      const fetched = await ScheduleService.getScheduleById(testOrgAId, sched.id);
+      assert.strictEqual(fetched, null);
+    });
   });
 
   // -------------------------------------------------------------
@@ -437,6 +595,29 @@ describe("Step 2: Core Schema, Concurrency Locks & Master Data Test Suite", () =
 
       assert.strictEqual(result.role, "doctor");
       assert.strictEqual(result.clinicId, "org-1");
+    });
+
+    it("rejects invalid doctor phone numbers in createDoctorSchema validation", () => {
+      const invalidResult = createDoctorSchema.safeParse({
+        fullName: "Dr. Invalid Phone",
+        specialty: "Pathology",
+        phone: "12345", // Invalid Indian phone
+      });
+
+      assert.strictEqual(invalidResult.success, false);
+      if (!invalidResult.success) {
+        assert.ok(
+          invalidResult.error.issues.some((i) => i.path.includes("phone")),
+          "Must report validation error on invalid phone"
+        );
+      }
+
+      const validResult = createDoctorSchema.safeParse({
+        fullName: "Dr. Valid Phone",
+        specialty: "Pathology",
+        phone: "9876543210",
+      });
+      assert.strictEqual(validResult.success, true);
     });
   });
 });

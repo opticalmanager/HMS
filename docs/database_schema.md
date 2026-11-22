@@ -152,6 +152,7 @@ Strict governance and token telemetry audit trail. Zero PHI / zero raw audio log
 - `status` (ENUM: `SUCCESS`, `ERROR`, `BLOCKED`)
 - `errorCode` (TEXT, nullable)
 - `createdAt` (TIMESTAMPTZ)
+- `updatedAt` (TIMESTAMPTZ)
 
 ### 8. `patients` (`db/schema/patients.ts`)
 Universal patient master file with longitudinal clinical identifiers.

@@ -13,6 +13,10 @@ export interface FuzzyTariffResult extends ServiceTariffEntity {
   needsReview: boolean;
 }
 
+function isValidUuid(id: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+}
+
 /**
  * Fuzzy matches medicines in the clinic catalog using pg_trgm similarity on brand_name and generic_name.
  * Scoped strictly by organizationId and is_active = true.
@@ -26,12 +30,13 @@ export async function fuzzyMatchMedicines(
   query: string,
   limit = 5
 ): Promise<FuzzyMedicineResult[]> {
-  if (!organizationId || !query || !query.trim()) {
+  if (!organizationId || !query || !query.trim() || !isValidUuid(organizationId)) {
     return [];
   }
 
   const cleanQuery = query.trim();
   const ilikePattern = `%${cleanQuery}%`;
+  const safeLimit = Math.max(1, Math.min(100, Number.isFinite(limit) ? Math.floor(limit) : 5));
 
   // Parameterized query using similarity() from pg_trgm
   const results = await db.execute<{
@@ -81,7 +86,7 @@ export async function fuzzyMatchMedicines(
         OR generic_name ILIKE ${ilikePattern}
       )
     ORDER BY raw_score DESC
-    LIMIT ${limit};
+    LIMIT ${safeLimit};
   `);
 
   return (results as unknown as Array<Record<string, unknown>>).map((row) => {
@@ -120,12 +125,13 @@ export async function fuzzyMatchTariffs(
   query: string,
   limit = 5
 ): Promise<FuzzyTariffResult[]> {
-  if (!organizationId || !query || !query.trim()) {
+  if (!organizationId || !query || !query.trim() || !isValidUuid(organizationId)) {
     return [];
   }
 
   const cleanQuery = query.trim();
   const ilikePattern = `%${cleanQuery}%`;
+  const safeLimit = Math.max(1, Math.min(100, Number.isFinite(limit) ? Math.floor(limit) : 5));
 
   const results = await db.execute<{
     id: string;
@@ -167,7 +173,7 @@ export async function fuzzyMatchTariffs(
         OR name ILIKE ${ilikePattern}
       )
     ORDER BY raw_score DESC
-    LIMIT ${limit};
+    LIMIT ${safeLimit};
   `);
 
   return (results as unknown as Array<Record<string, unknown>>).map((row) => {

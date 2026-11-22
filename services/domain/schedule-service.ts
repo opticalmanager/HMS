@@ -55,7 +55,7 @@ export class ScheduleService {
    */
   static async createSchedule(
     organizationId: string,
-    input: z.infer<typeof createDoctorScheduleSchema>
+    input: z.input<typeof createDoctorScheduleSchema>
   ): Promise<DoctorScheduleEntity> {
     const [created] = await db
       .insert(doctorSchedules)
@@ -98,6 +98,21 @@ export class ScheduleService {
       .returning();
 
     return updated || null;
+  }
+
+  /**
+   * Deletes an existing doctor recurring schedule block.
+   */
+  static async deleteSchedule(
+    organizationId: string,
+    scheduleId: string
+  ): Promise<boolean> {
+    const result = await db
+      .delete(doctorSchedules)
+      .where(and(eq(doctorSchedules.organizationId, organizationId), eq(doctorSchedules.id, scheduleId)))
+      .returning();
+
+    return result.length > 0;
   }
 
   /**

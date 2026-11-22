@@ -76,9 +76,43 @@ static deleteSlotBlock(
   organizationId: string,
   blockId: string
 ): Promise<boolean>;
+
+static deleteSchedule(
+  organizationId: string,
+  scheduleId: string
+): Promise<boolean>;
 ```
 
-### 4. `CatalogService` (`services/domain/catalog-service.ts`)
+### 4. `AppointmentDomainService` (`services/domain/appointment-service.ts`)
+```ts
+static listAppointments(
+  clinicId: string,
+  options?: { limit?: number; doctorId?: string; patientId?: string; status?: string; appointmentDate?: string }
+): Promise<AppointmentEntity[]>;
+
+static getAppointmentById(
+  clinicId: string,
+  appointmentId: string
+): Promise<AppointmentEntity | null>;
+
+static createAppointment(
+  clinicId: string,
+  input: CreateAppointmentInput
+): Promise<{ appointment: AppointmentEntity; isDuplicate?: boolean }>;
+
+static updateAppointment(
+  clinicId: string,
+  appointmentId: string,
+  input: UpdateAppointmentInput
+): Promise<AppointmentEntity | null>;
+
+static cancelAppointment(
+  clinicId: string,
+  appointmentId: string
+): Promise<AppointmentEntity | null>;
+```
+
+### 5. `CatalogService` (`services/domain/catalog-service.ts`)
 ```ts
 static listMedicines(
   organizationId: string,
@@ -176,6 +210,12 @@ export function decryptBroadcastApiKey(cipherString: string): string;
 - **Payload**: `{ id, dayOfWeek?, startTime?, endTime?, slotDurationMins?, isActive? }`
 - **Response**: `{ success: true, schedule: {...} }`
 
+### 6. `DELETE /api/crm/schedules`
+- **Purpose**: Delete a recurring weekly schedule block.
+- **RBAC Requirement**: `{ schedule: ["manage_own"] }`. Doctors get 403 Forbidden when attempting to delete another doctor's schedule.
+- **Query Params**: `id=<scheduleUuid>`
+- **Response**: `{ success: true, message: "Schedule removed successfully" }`
+
 ### 6. `GET /api/crm/schedules/blocks`
 - **Purpose**: List doctor calendar leaves and temporary slot blocks.
 - **RBAC Requirement**: `{ schedule: ["read"] }`
@@ -229,3 +269,15 @@ export function decryptBroadcastApiKey(cipherString: string): string;
 - **RBAC Requirement**: `{ billing: ["void"] }`
 - **Payload**: `{ id, name?, category?, price?, taxRate?, hsnSacCode?, isActive? }`
 - **Response**: `{ success: true, tariff: {...} }`
+
+### 15. `POST /api/crm/appointments`
+- **Purpose**: Atomically schedule an appointment with concurrency locking, slot block conflict detection, and write idempotency.
+- **RBAC Requirement**: `{ appointment: ["create"] }`
+- **Payload**: `{ patientId, doctorId, branchId?, department, appointmentDate, timeSlot, slotStart?, slotEnd?, source?, idempotencyKey?, tokenNumber?, priority?, chiefComplaints?, consultationFee? }`
+- **Response**: HTTP 201 `{ success: true, appointment: {...}, duplicate: false }` on new booking; HTTP 200 `{ success: true, appointment: {...}, duplicate: true }` on duplicate idempotency key retry; HTTP 409 `{ success: false, error: "...", code: "SLOT_CONFLICT" | "SLOT_BLOCKED" }` on concurrent collision or slot block.
+
+### 16. `PATCH /api/crm/appointments/:id`
+- **Purpose**: Update appointment status or reschedule with concurrency checking.
+- **RBAC Requirement**: `{ appointment: ["update"] }`
+- **Payload**: `{ appointmentDate?, timeSlot?, slotStart?, slotEnd?, status?, priority?, chiefComplaints?, consultationFee?, isPaid? }`
+- **Response**: `{ success: true, appointment: {...} }` or HTTP 409 on slot collision.

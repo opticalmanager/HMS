@@ -1,21 +1,27 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { eq, desc } from "drizzle-orm";
-import { db } from "@/lib/drizzle";
-import { appointments } from "@/db/schema/appointments";
 import { requireClinicSession, handleAuthError } from "@/lib/auth-guard";
+import {
+  AppointmentDomainService,
+  SlotConflictError,
+  SlotBlockedError,
+} from "@/services/domain/appointment-service";
 
 const createAppointmentSchema = z.object({
   patientId: z.string().uuid("Invalid patient UUID"),
   doctorId: z.string().uuid("Invalid doctor UUID"),
-  branchId: z.string().uuid("Invalid branch UUID"),
+  branchId: z.string().uuid("Invalid branch UUID").nullable().optional(),
   department: z.string().min(1, "Department is required"),
   appointmentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format: YYYY-MM-DD"),
   timeSlot: z.string().min(1, "Time slot is required"),
+  slotStart: z.string().datetime({ offset: true }).or(z.date()).optional().nullable(),
+  slotEnd: z.string().datetime({ offset: true }).or(z.date()).optional().nullable(),
+  source: z.enum(["WEB", "WHATSAPP", "VOICE_DOGRAH"]).default("WEB"),
+  idempotencyKey: z.string().trim().min(1).optional().nullable(),
   tokenNumber: z.number().int().positive().optional(),
   priority: z.enum(["normal", "urgent", "emergency"]).default("normal"),
-  chiefComplaints: z.string().optional(),
-  consultationFee: z.string().default("500.00"),
+  chiefComplaints: z.string().optional().nullable(),
+  consultationFee: z.string().or(z.number()).transform((v) => String(v)).default("500.00"),
 });
 
 export async function GET(request: NextRequest) {
@@ -25,13 +31,21 @@ export async function GET(request: NextRequest) {
       { headers: request.headers, redirectIfUnauthorized: false }
     );
 
-    // Strict tenant isolation: EVERY query MUST explicitly filter by clinicId
-    const data = await db
-      .select()
-      .from(appointments)
-      .where(eq(appointments.organizationId, clinicId))
-      .orderBy(desc(appointments.createdAt))
-      .limit(50);
+    const { searchParams } = new URL(request.url);
+    const doctorId = searchParams.get("doctorId") || undefined;
+    const patientId = searchParams.get("patientId") || undefined;
+    const status = searchParams.get("status") || undefined;
+    const appointmentDate = searchParams.get("date") || undefined;
+    const limit = searchParams.get("limit") ? parseInt(searchParams.get("limit")!, 10) : 50;
+
+    // Strict tenant isolation: Single Domain Service Layer
+    const data = await AppointmentDomainService.listAppointments(clinicId, {
+      doctorId,
+      patientId,
+      status,
+      appointmentDate,
+      limit,
+    });
 
     return NextResponse.json({
       success: true,
@@ -70,30 +84,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const tokenNumber = parsed.data.tokenNumber || Math.floor(Math.random() * 90 + 10);
+    try {
+      // Concurrency locks, slot blocks & idempotency managed by single domain service
+      const result = await AppointmentDomainService.createAppointment(clinicId, parsed.data);
 
-    // Strict tenant isolation: organizationId ALWAYS comes from requireClinicSession
-    const [newAppointment] = await db
-      .insert(appointments)
-      .values({
-        organizationId: clinicId,
-        branchId: parsed.data.branchId,
-        patientId: parsed.data.patientId,
-        doctorId: parsed.data.doctorId,
-        department: parsed.data.department,
-        appointmentDate: parsed.data.appointmentDate,
-        timeSlot: parsed.data.timeSlot,
-        tokenNumber,
-        priority: parsed.data.priority,
-        chiefComplaints: parsed.data.chiefComplaints,
-        consultationFee: parsed.data.consultationFee,
-      })
-      .returning();
-
-    return NextResponse.json(
-      { success: true, appointment: newAppointment },
-      { status: 201 }
-    );
+      return NextResponse.json(
+        {
+          success: true,
+          appointment: result.appointment,
+          duplicate: result.isDuplicate ?? false,
+        },
+        { status: result.isDuplicate ? 200 : 201 }
+      );
+    } catch (err: unknown) {
+      if (err instanceof SlotConflictError || err instanceof SlotBlockedError) {
+        return NextResponse.json(
+          { success: false, error: err.message, code: err.code },
+          { status: 409 }
+        );
+      }
+      throw err;
+    }
   } catch (error) {
     return handleAuthError(error);
   }

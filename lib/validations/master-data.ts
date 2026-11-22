@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { normalizePhoneE164 } from "@/lib/phone";
 
 export const medicineForms = [
   "TABLET",
@@ -50,7 +51,13 @@ export const createDoctorSchema = z.object({
   userId: z.string().uuid("Invalid user UUID").nullable().optional(),
   fullName: z.string().trim().min(2, "Full name must be at least 2 characters"),
   specialty: z.string().trim().min(2, "Specialty is required"),
-  phone: z.string().trim().optional(),
+  phone: z
+    .string()
+    .trim()
+    .refine((val) => !val || normalizePhoneE164(val) !== null, {
+      message: "Invalid phone number format",
+    })
+    .optional(),
   consultationFee: z.string().or(z.number()).transform((val) => String(val)).default("500.00"),
   isActive: z.boolean().default(true),
 });

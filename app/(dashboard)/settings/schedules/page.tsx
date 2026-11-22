@@ -222,6 +222,26 @@ export default function DoctorSchedulesPage() {
     }
   };
 
+  const handleDeleteSchedule = async (scheduleId: string) => {
+    if (!confirm("Are you sure you want to delete this weekly recurring schedule?")) return;
+
+    try {
+      const res = await fetch(`/api/crm/schedules?id=${scheduleId}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to delete schedule");
+      }
+
+      toast.success("Doctor schedule deleted");
+      fetchData();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Error deleting schedule";
+      toast.error(msg);
+    }
+  };
+
   return (
     <div className="space-y-4 max-w-6xl mx-auto">
       {/* Subnavigation Bar */}
@@ -322,12 +342,13 @@ export default function DoctorSchedulesPage() {
                 <TableHead className="text-xs font-semibold text-slate-700">Operating Hours</TableHead>
                 <TableHead className="text-xs font-semibold text-slate-700">Slot Duration</TableHead>
                 <TableHead className="text-xs font-semibold text-slate-700">Status</TableHead>
+                <TableHead className="text-xs font-semibold text-slate-700 text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {schedules.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8 text-xs text-slate-400">
+                  <TableCell colSpan={6} className="text-center py-8 text-xs text-slate-400">
                     No recurring doctor schedules registered. Click &quot;Add Weekly Schedule&quot; to configure.
                   </TableCell>
                 </TableRow>
@@ -356,6 +377,17 @@ export default function DoctorSchedulesPage() {
                           Disabled
                         </Badge>
                       )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteSchedule(s.id)}
+                        className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 cursor-pointer"
+                        title="Delete recurring schedule"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))

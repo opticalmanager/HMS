@@ -1,13 +1,17 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { eq, and } from "drizzle-orm";
-import { db } from "@/lib/drizzle";
-import { appointments } from "@/db/schema/appointments";
 import { requireClinicSession, handleAuthError } from "@/lib/auth-guard";
+import {
+  AppointmentDomainService,
+  SlotConflictError,
+  SlotBlockedError,
+} from "@/services/domain/appointment-service";
 
 const updateAppointmentSchema = z.object({
   appointmentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format: YYYY-MM-DD").optional(),
   timeSlot: z.string().min(1).optional(),
+  slotStart: z.string().datetime({ offset: true }).or(z.date()).optional().nullable(),
+  slotEnd: z.string().datetime({ offset: true }).or(z.date()).optional().nullable(),
   status: z
     .enum(["scheduled", "arrived", "in_consultation", "completed", "cancelled", "no_show"])
     .optional(),
@@ -29,12 +33,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
       { headers: request.headers, redirectIfUnauthorized: false }
     );
 
-    // IDOR Protection: Strict compound filter scoping by clinicId and id
-    const [appointment] = await db
-      .select()
-      .from(appointments)
-      .where(and(eq(appointments.organizationId, clinicId), eq(appointments.id, id)))
-      .limit(1);
+    // IDOR Protection: Strict compound filter scoping via domain service
+    const appointment = await AppointmentDomainService.getAppointmentById(clinicId, id);
 
     if (!appointment) {
       return NextResponse.json(
@@ -84,31 +84,38 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       );
     }
 
-    // IDOR Protection: Update strictly where organizationId == clinicId AND id == id
-    const [updatedAppointment] = await db
-      .update(appointments)
-      .set({
-        ...parsed.data,
-        updatedAt: new Date(),
-      })
-      .where(and(eq(appointments.organizationId, clinicId), eq(appointments.id, id)))
-      .returning();
-
-    if (!updatedAppointment) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Appointment not found or belongs to another clinic organization",
-          code: "NOT_FOUND",
-        },
-        { status: 404 }
+    try {
+      // IDOR Protection: Update strictly where organizationId == clinicId AND id == id
+      const updatedAppointment = await AppointmentDomainService.updateAppointment(
+        clinicId,
+        id,
+        parsed.data
       );
-    }
 
-    return NextResponse.json({
-      success: true,
-      appointment: updatedAppointment,
-    });
+      if (!updatedAppointment) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Appointment not found or belongs to another clinic organization",
+            code: "NOT_FOUND",
+          },
+          { status: 404 }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        appointment: updatedAppointment,
+      });
+    } catch (err: unknown) {
+      if (err instanceof SlotConflictError || err instanceof SlotBlockedError) {
+        return NextResponse.json(
+          { success: false, error: err.message, code: err.code },
+          { status: 409 }
+        );
+      }
+      throw err;
+    }
   } catch (error) {
     return handleAuthError(error);
   }
@@ -122,15 +129,8 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
       { headers: request.headers, redirectIfUnauthorized: false }
     );
 
-    // IDOR Protection: Soft cancel or delete strictly scoped by clinicId and id
-    const [cancelled] = await db
-      .update(appointments)
-      .set({
-        status: "cancelled",
-        updatedAt: new Date(),
-      })
-      .where(and(eq(appointments.organizationId, clinicId), eq(appointments.id, id)))
-      .returning();
+    // IDOR Protection: Soft cancel strictly scoped by clinicId and id, freeing slot lock
+    const cancelled = await AppointmentDomainService.cancelAppointment(clinicId, id);
 
     if (!cancelled) {
       return NextResponse.json(

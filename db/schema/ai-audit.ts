@@ -22,6 +22,7 @@ export const aiAuditLogs = pgTable(
     status: text("status", { enum: ["SUCCESS", "ERROR", "BLOCKED"] }).notNull(),
     errorCode: text("error_code"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     index("ai_audit_logs_organization_id_idx").on(table.organizationId),
