@@ -130,3 +130,21 @@ Before marking any task complete, verify and report:
      3. **The Global Command Palette (`CommandPalette.tsx` / `Ctrl+K`)**: With search keywords and descriptions.
      4. **The Topbar user menu (`AppTopbar.tsx`) or parent dashboard quick action cards**.
    - No task touching UI routes may be marked complete without verifying that users can reach the page in 1–2 clicks from anywhere in the application.
+7. **Omnichannel Responsive Design (Mobile, Tablet & Desktop PC Ergonomics)**:
+   - Every screen, form, table, dialog, and dashboard component must be built mobile-first and adapt cleanly across all screen breakpoints (`sm: 640px`, `md: 768px`, `lg: 1024px`, `xl: 1280px+`):
+     - **Mobile (< 768px - Smartphones):**
+       - Primary layouts must collapse into a single vertical stack (`flex-col`, `grid-cols-1 w-full`).
+       - Full sidebar collapses into a slide-over mobile drawer or sheet menu—never squash or hide content behind fixed sidebars.
+       - Dense data tables must be wrapped in `overflow-x-auto` with touch inertia or render as mobile-friendly stacked encounter cards with key actions accessible without horizontal panning.
+       - Forms and modals must adapt: modals render as full-width bottom sheets or scrollable viewports (`max-h-[90vh]`) to prevent modal clipping by mobile keyboards. Touch targets must maintain a minimum 44×44px hit area.
+       - Tab bars and action toolbars must use `flex-wrap` or horizontal scrolling strips (`overflow-x-auto scrollbar-none flex-nowrap`) so buttons never clip or wrap awkwardly.
+     - **Tablet (768px – 1024px - iPads / Clinical Tablets):**
+       - Grids scale to 2-column or 3-column splits (`md:grid-cols-2`).
+       - Master-detail views (e.g. patient queue list alongside active encounter notes) should adopt split-pane or toggleable drawer ergonomics.
+       - Sidebar supports collapsed icon-rail mode to maximize clinical canvas area.
+     - **Desktop PC (≥ 1024px - Reception Desks & Doctor Laptops):**
+       - Maintain compact Linear/Stripe high-density POS standard (`h-9` inputs, `py-2 px-3` table rows, 4-column KPI cards) to maximize information density without vertical scroll fatigue.
+     - **General Component Invariants:**
+       - **Zero Fixed Pixel Containers:** Never use fixed pixel container widths (e.g., `w-[1100px]`); always use fluid percentages or Tailwind responsive containers (`w-full max-w-7xl mx-auto`).
+       - **Zero Viewport Bleed:** Prevent horizontal window scrollbars on root layout (`w-full overflow-x-hidden`).
+       - Always test and verify responsive UI rendering across mobile (`375px`), tablet (`768px`), and desktop (`1280px+`) viewports before marking any frontend task complete.
