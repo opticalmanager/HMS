@@ -47,6 +47,9 @@ function LoginForm() {
           organizationId: orgs[0].id,
         });
         router.push(callbackUrl);
+      } else if (callbackUrl && callbackUrl !== "/dashboard") {
+        // User was invited and directed to an invite flow or specific resource
+        router.push(callbackUrl);
       } else {
         router.push("/onboarding");
       }
@@ -139,7 +142,10 @@ function LoginForm() {
 
           <div className="pt-2 text-center text-xs text-slate-600">
             Don&apos;t have a clinic account?{" "}
-            <Link href="/signup" className="text-[#2563EB] font-semibold hover:underline">
+            <Link
+              href={callbackUrl && callbackUrl !== "/dashboard" ? `/signup?next=${encodeURIComponent(callbackUrl)}` : "/signup"}
+              className="text-[#2563EB] font-semibold hover:underline"
+            >
               Register New Staff
             </Link>
           </div>

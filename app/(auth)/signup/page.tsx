@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Activity,
   Lock,
@@ -20,8 +20,11 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { signUp, authClient } from "@/lib/auth-client";
 
-export default function SignupPage() {
+function SignupForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get("next") || searchParams.get("callbackUrl");
+  const isAcceptingInvite = !!(callbackUrl && callbackUrl.startsWith("/accept-invitation"));
 
   const [name, setName] = React.useState("");
   const [email, setEmail] = React.useState("");
@@ -65,7 +68,14 @@ export default function SignupPage() {
         return;
       }
 
-      // Automatically create clinic organization for the newly registered clinical admin
+      // If user came via an invitation link, navigate directly to invitation page without creating a dummy clinic
+      if (isAcceptingInvite && callbackUrl) {
+        router.push(callbackUrl);
+        router.refresh();
+        return;
+      }
+
+      // Automatically create clinic organization for a new clinical owner
       try {
         const orgName =
           clinicName.trim() ||
@@ -113,10 +123,12 @@ export default function SignupPage() {
           <Activity className="h-6 w-6" />
         </div>
         <CardTitle className="text-xl font-bold text-slate-900 tracking-tight">
-          Register Clinical Account
+          {isAcceptingInvite ? "Register Staff Account" : "Register Clinical Account"}
         </CardTitle>
         <CardDescription className="text-xs text-slate-500">
-          Create Doctor or Hospital Administrator Profile with Instant Workspace
+          {isAcceptingInvite
+            ? "Create your staff account to accept your clinic invitation"
+            : "Create Doctor or Hospital Administrator Profile with Instant Workspace"}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -162,27 +174,29 @@ export default function SignupPage() {
             </div>
           </div>
 
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="text-xs font-medium text-slate-700">
-                Clinic / Hospital Name
-              </label>
-              <span className="text-[10px] text-slate-400 font-normal">Optional</span>
+          {!isAcceptingInvite && (
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-medium text-slate-700">
+                  Clinic / Hospital Name
+                </label>
+                <span className="text-[10px] text-slate-400 font-normal">Optional</span>
+              </div>
+              <div className="relative flex items-center">
+                <Building2 className="absolute left-3 h-4 w-4 text-slate-400" />
+                <Input
+                  type="text"
+                  value={clinicName}
+                  onChange={(e) => setClinicName(e.target.value)}
+                  className="pl-9 h-9 text-xs"
+                  placeholder={name.trim() ? `${name.trim()}'s Clinic` : "Apex Multispecialty Hospital"}
+                />
+              </div>
+              <span className="text-[10px] text-slate-400 mt-0.5 block">
+                Your clinic organization workspace will be initialized automatically upon signup.
+              </span>
             </div>
-            <div className="relative flex items-center">
-              <Building2 className="absolute left-3 h-4 w-4 text-slate-400" />
-              <Input
-                type="text"
-                value={clinicName}
-                onChange={(e) => setClinicName(e.target.value)}
-                className="pl-9 h-9 text-xs"
-                placeholder={name.trim() ? `${name.trim()}'s Clinic` : "Apex Multispecialty Hospital"}
-              />
-            </div>
-            <span className="text-[10px] text-slate-400 mt-0.5 block">
-              Your clinic organization workspace will be initialized automatically upon signup.
-            </span>
-          </div>
+          )}
 
           <div>
             <label className="text-xs font-medium text-slate-700 block mb-1">
@@ -269,12 +283,21 @@ export default function SignupPage() {
             className="w-full h-9 bg-[#2563EB] hover:bg-blue-700 text-white font-medium text-xs mt-2 transition-all shadow-xs"
             disabled={loading}
           >
-            {loading ? "Creating Clinical Account & Workspace..." : "Create Account & Setup Clinic"}
+            {loading
+              ? isAcceptingInvite
+                ? "Creating Staff Account..."
+                : "Creating Clinical Account & Workspace..."
+              : isAcceptingInvite
+              ? "Create Staff Account & Proceed to Invite"
+              : "Create Account & Setup Clinic"}
           </Button>
 
           <div className="pt-2 text-center text-xs text-slate-600">
             Already have an account?{" "}
-            <Link href="/login" className="text-[#2563EB] font-semibold hover:underline">
+            <Link
+              href={callbackUrl ? `/login?next=${encodeURIComponent(callbackUrl)}` : "/login"}
+              className="text-[#2563EB] font-semibold hover:underline"
+            >
               Sign In
             </Link>
           </div>
@@ -286,5 +309,19 @@ export default function SignupPage() {
         </form>
       </CardContent>
     </Card>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <React.Suspense
+      fallback={
+        <div className="min-h-[300px] flex items-center justify-center">
+          <Activity className="h-8 w-8 text-[#2563EB] animate-spin" />
+        </div>
+      }
+    >
+      <SignupForm />
+    </React.Suspense>
   );
 }

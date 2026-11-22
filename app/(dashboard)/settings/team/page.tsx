@@ -121,7 +121,7 @@ export default function TeamSettingsPage() {
 
   const currentMember = members.find((m) => m.user?.id === session?.user?.id);
   const currentUserRole = currentMember?.role;
-  const isAuthorized = !currentUserRole || currentUserRole === "owner" || currentUserRole === "admin";
+  const isAuthorized = currentUserRole === "owner" || currentUserRole === "admin";
   const ownerCount = members.filter((m) => m.role === "owner").length;
 
   const handleInviteStaff = async (e: React.FormEvent) => {
@@ -159,6 +159,10 @@ export default function TeamSettingsPage() {
       toast.error("Cannot demote the sole Clinic Owner. Designate another owner first.");
       return;
     }
+    if (currentRole === "owner" && currentUserRole !== "owner") {
+      toast.error("Only Clinic Owners can modify owner privileges.");
+      return;
+    }
     try {
       const res = await authClient.organization.updateMemberRole({
         memberId,
@@ -178,6 +182,10 @@ export default function TeamSettingsPage() {
   const handleRemoveMember = async (memberId: string, role: string) => {
     if (role === "owner" && ownerCount <= 1) {
       toast.error("Cannot remove the sole Clinic Owner of this organization.");
+      return;
+    }
+    if (role === "owner" && currentUserRole !== "owner") {
+      toast.error("Only Clinic Owners can remove an owner.");
       return;
     }
     if (!confirm("Are you sure you want to remove this staff member from the clinic?")) {
@@ -217,8 +225,14 @@ export default function TeamSettingsPage() {
   const handleCopyInviteLink = (invitationId: string) => {
     const origin = typeof window !== "undefined" ? window.location.origin : "";
     const inviteLink = `${origin}/accept-invitation/${invitationId}`;
-    navigator.clipboard.writeText(inviteLink);
-    toast.success("Dev invite link copied to clipboard!");
+    if (typeof navigator !== "undefined" && navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(inviteLink).then(
+        () => toast.success("Dev invite link copied to clipboard!"),
+        () => toast.info(`Invite link: ${inviteLink}`)
+      );
+    } else {
+      toast.info(`Invite link: ${inviteLink}`);
+    }
   };
 
   if (!loading && members.length > 0 && !isAuthorized) {
@@ -436,10 +450,16 @@ export default function TeamSettingsPage() {
                         <td className="py-2.5 px-4">
                           <select
                             value={m.role}
-                            disabled={isSoleOwner}
+                            disabled={isSoleOwner || (m.role === "owner" && currentUserRole !== "owner")}
                             onChange={(e) => handleUpdateRole(m.id, m.role, e.target.value)}
                             className="h-8 px-2 py-1 text-xs border border-slate-300 rounded bg-white text-slate-700 disabled:opacity-50 disabled:bg-slate-100"
-                            title={isSoleOwner ? "Cannot demote sole owner" : "Change staff role"}
+                            title={
+                              isSoleOwner
+                                ? "Cannot demote sole owner"
+                                : m.role === "owner" && currentUserRole !== "owner"
+                                ? "Only clinic owners can change owner roles"
+                                : "Change staff role"
+                            }
                           >
                             <option value="owner">Owner</option>
                             <option value="admin">Admin</option>
@@ -451,10 +471,16 @@ export default function TeamSettingsPage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            disabled={isSoleOwner}
+                            disabled={isSoleOwner || (m.role === "owner" && currentUserRole !== "owner")}
                             onClick={() => handleRemoveMember(m.id, m.role)}
                             className="h-7 px-2 text-[11px] text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200 disabled:opacity-40"
-                            title={isSoleOwner ? "Cannot remove sole owner" : "Remove staff member"}
+                            title={
+                              isSoleOwner
+                                ? "Cannot remove sole owner"
+                                : m.role === "owner" && currentUserRole !== "owner"
+                                ? "Only clinic owners can remove an owner"
+                                : "Remove staff member"
+                            }
                           >
                             <Trash2 className="h-3 w-3 mr-1" />
                             <span>Remove</span>

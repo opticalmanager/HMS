@@ -40,6 +40,9 @@ export class ForbiddenError extends ClinicAuthError {
 }
 
 export function handleAuthError(err: unknown): NextResponse {
+  if (typeof err === "object" && err !== null && "digest" in err) {
+    throw err;
+  }
   if (err instanceof ClinicAuthError) {
     return NextResponse.json(
       { success: false, error: err.message, code: err.code },
@@ -135,7 +138,7 @@ export async function requireClinicSession(
     reqHeaders = new Headers();
   }
 
-  const shouldRedirect = options?.redirectIfUnauthorized ?? true;
+  const shouldRedirect = options?.redirectIfUnauthorized ?? false;
 
   // 1. Validate session from request headers (or trusted testing override)
   let session = options?.session;

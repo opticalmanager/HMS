@@ -220,9 +220,9 @@ export default function AcceptInvitationPage() {
             )}
 
             {!session ? (
-              <div className="space-y-3 pt-2">
+              <div className="space-y-2.5 pt-2">
                 <p className="text-xs text-slate-600 text-center">
-                  Please log in or register with your staff account to accept this invitation.
+                  Please sign in or register your staff account to accept this invitation.
                 </p>
                 <Button
                   onClick={() => router.push(`/login?next=/accept-invitation/${invitationId}`)}
@@ -230,6 +230,14 @@ export default function AcceptInvitationPage() {
                 >
                   <LogIn className="h-4 w-4" />
                   <span>Sign In to Accept Invitation</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => router.push(`/signup?next=/accept-invitation/${invitationId}`)}
+                  className="w-full h-9 text-xs text-slate-700 hover:bg-slate-50 flex items-center justify-center gap-2 border-slate-200"
+                >
+                  <Users className="h-4 w-4 text-slate-400" />
+                  <span>Register New Staff Account</span>
                 </Button>
               </div>
             ) : (

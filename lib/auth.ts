@@ -61,7 +61,11 @@ export const auth = betterAuth({
       requireEmailVerificationOnInvitation: false,
       sendInvitationEmail: async (data) => {
         const inviteLink = `${env.NEXT_PUBLIC_APP_URL}/accept-invitation/${data.id}`;
-        console.log(`[BETTER-AUTH INVITATION] Dispatched invite to ${data.email}. Acceptance URL: ${inviteLink}`);
+        const maskedEmail =
+          env.NODE_ENV === "production"
+            ? data.email.replace(/(.{2})(.*)(@.*)/, "$1***$3")
+            : data.email;
+        console.log(`[BETTER-AUTH INVITATION] Dispatched invite to ${maskedEmail}. Acceptance URL: ${inviteLink}`);
       },
       schema: {
         organization: {

@@ -6,12 +6,23 @@
 1. **Clinical Signup (`/signup`)**:
    - Clinical staff or hospital owner registers with **Full Legal Name**, **Official Email**, an optional **Clinic / Hospital Name**, **Password** (min 8 chars), and **Confirm Password**.
    - Features password visibility toggles (`Eye` / `EyeOff`) and real-time password matching validation.
-   - Upon successful account registration, the system automatically provisions the user's clinic organization (e.g., `"[Name]'s Clinic"` or user-specified name) with a unique tenant slug, assigns the registering user the `owner` role, sets the organization as active (`organization.setActive`), and transitions directly to `/dashboard`.
+   - When invited to an existing hospital via an invitation link (`?next=/accept-invitation/[id]`), the signup flow bypasses duplicate clinic creation and routes the newly registered staff member directly to their invitation acceptance page.
+   - For standalone owners, the system automatically provisions the clinic organization (e.g., `"[Name]'s Clinic"` or custom name) with a unique slug, assigns the registering user the `owner` role, sets the organization active, and transitions directly to `/dashboard`.
    - If organization provisioning is deferred, the user is safely routed to `/onboarding`.
-2. **Clinical Staff Login (`/login`)**:
-   - Secure authentication via Better Auth email and password.
-   - Evaluates active organization memberships. If organizations exist, the primary clinic is activated and the user is redirected to `/dashboard` (or requested callback URL); if no organization exists, routes to `/onboarding`.
-3. **Multi-Origin & Reverse Proxy Resilience**:
+2. **Clinical Staff Login (`/login`) & Invitation Flow**:
+   - Secure authentication via Better Auth email and password with `next` query parameter support.
+   - Evaluates active organization memberships. If organizations exist, the primary clinic is activated and the user is redirected to `next` (or `/dashboard`).
+   - If an invited staff member signs in with 0 active organizations, the system preserves their invitation target URL (`/accept-invitation/[id]`) rather than trapping them in `/onboarding`.
+3. **Staff Invitation & Acceptance (`/accept-invitation/[id]`)**:
+   - Dedicated invitation acceptance screen displaying hospital name, invited email, designated RBAC role badge, and role capability descriptions.
+   - One-click acceptance (`acceptInvitation`) activates the clinic membership (`setActive`) and routes directly to `/dashboard`.
+   - One-click decline (`rejectInvitation`) safely voids the invitation and returns to `/dashboard`.
+4. **Team & RBAC Management (`/dashboard/settings/team`)**:
+   - Restricted to `owner` and `admin` roles.
+   - Real-time role promotions/demotions with sole-owner protection (cannot demote or remove the sole owner).
+   - Owner hierarchy enforcement: administrative staff cannot demote or remove hospital owners; only owners possess owner-level management privileges.
+   - Copyable dev invitation acceptance links and invitation cancellation.
+5. **Multi-Origin & Reverse Proxy Resilience**:
    - `lib/auth.ts` dynamically validates incoming request origins against trusted local patterns (`localhost:*`, `127.0.0.1:*`, private LAN subnets) and production domains, eliminating `Invalid origin` rejections across reverse proxies, Docker standalone environments, and local dev ports.
 
 ---

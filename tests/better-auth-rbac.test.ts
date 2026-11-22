@@ -153,6 +153,23 @@ describe("Better Auth Multi-Tenant RBAC & Clinical Access Control Suite", () => 
       );
     });
 
+    it("rejects unauthenticated requests by default without redirecting when redirectIfUnauthorized is omitted", async () => {
+      const emptyHeaders = new Headers();
+      await assert.rejects(
+        async () => {
+          await requireClinicSession(undefined, {
+            headers: emptyHeaders,
+          });
+        },
+        (err: unknown) => {
+          assert.ok(err instanceof UnauthorizedError);
+          assert.ok(err instanceof ClinicAuthError);
+          assert.strictEqual((err as ClinicAuthError).status, 401);
+          return true;
+        }
+      );
+    });
+
     it("redirects unauthenticated requests to /login when redirectIfUnauthorized is true", async () => {
       const emptyHeaders = new Headers();
       await assert.rejects(
@@ -375,6 +392,13 @@ describe("Better Auth Multi-Tenant RBAC & Clinical Access Control Suite", () => 
 
       const response = handleAuthError(unauth);
       assert.strictEqual(response.status, 401);
+
+      // Re-throws Next.js navigation redirect errors rather than masking as 500
+      const redirectErr = { digest: "NEXT_REDIRECT;/login;307" };
+      assert.throws(
+        () => handleAuthError(redirectErr),
+        (err: unknown) => (err as { digest: string }).digest === "NEXT_REDIRECT;/login;307"
+      );
     });
   });
 
