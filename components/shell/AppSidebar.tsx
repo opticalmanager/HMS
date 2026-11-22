@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -34,6 +35,14 @@ const NAV_ITEMS = [
   { label: "Staff & Doctors", href: "/staff", icon: Users2 },
   { label: "Audit Logs", href: "/audit-logs", icon: ShieldAlert },
   { label: "System Settings", href: "/settings", icon: Settings },
+];
+
+const SETTINGS_SUB_ITEMS = [
+  { label: "Clinic Profile", href: "/settings/clinic" },
+  { label: "Doctor Schedules", href: "/settings/schedules" },
+  { label: "Master Catalog", href: "/settings/catalog" },
+  { label: "Staff & Team", href: "/settings/team" },
+  { label: "Letterhead & Print", href: "/settings" },
 ];
 
 interface AppSidebarProps {
@@ -95,24 +104,54 @@ export function AppSidebar({ collapsed = false, onToggleCollapse }: AppSidebarPr
           </button>
         )}
         {NAV_ITEMS.map((item) => {
-          const isActive = pathname === item.href || pathname?.startsWith(`${item.href}/`);
+          const isSettings = item.href === "/settings";
+          const isActive = isSettings
+            ? pathname?.startsWith("/settings")
+            : pathname === item.href || pathname?.startsWith(`${item.href}/`);
           const Icon = item.icon;
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              title={collapsed ? item.label : undefined}
-              className={cn(
-                "flex items-center rounded-md text-xs font-medium transition-colors cursor-pointer",
-                collapsed ? "justify-center p-2.5" : "gap-2.5 px-2.5 py-1.5",
-                isActive
-                  ? "bg-[#2563EB] text-white shadow-xs font-semibold"
-                  : "text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+            <React.Fragment key={item.href}>
+              <Link
+                href={item.href}
+                title={collapsed ? item.label : undefined}
+                className={cn(
+                  "flex items-center rounded-md text-xs font-medium transition-colors cursor-pointer",
+                  collapsed ? "justify-center p-2.5" : "gap-2.5 px-2.5 py-1.5",
+                  isActive
+                    ? "bg-[#2563EB] text-white shadow-xs font-semibold"
+                    : "text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+                )}
+              >
+                <Icon className={cn("h-4 w-4 shrink-0", isActive ? "text-white" : "text-slate-500")} />
+                {!collapsed && <span className="truncate">{item.label}</span>}
+              </Link>
+
+              {/* Expandable Settings Sub-Navigation Tree */}
+              {isSettings && isActive && !collapsed && (
+                <div className="ml-4 pl-2.5 my-1 border-l-2 border-blue-200 space-y-0.5">
+                  {SETTINGS_SUB_ITEMS.map((sub) => {
+                    const isSubActive =
+                      sub.href === "/settings"
+                        ? pathname === "/settings"
+                        : pathname === sub.href || pathname.startsWith(`${sub.href}/`);
+                    return (
+                      <Link
+                        key={sub.href}
+                        href={sub.href}
+                        className={cn(
+                          "block py-1 px-2 rounded text-[11px] transition-colors truncate cursor-pointer",
+                          isSubActive
+                            ? "text-blue-700 font-bold bg-blue-50/80"
+                            : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                        )}
+                      >
+                        {sub.label}
+                      </Link>
+                    );
+                  })}
+                </div>
               )}
-            >
-              <Icon className={cn("h-4 w-4 shrink-0", isActive ? "text-white" : "text-slate-500")} />
-              {!collapsed && <span className="truncate">{item.label}</span>}
-            </Link>
+            </React.Fragment>
           );
         })}
       </nav>

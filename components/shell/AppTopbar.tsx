@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Search, Building2, User, LogOut, ChevronDown, Check, Plus } from "lucide-react";
+import { Search, Building2, User, LogOut, ChevronDown, Check, Plus, CalendarDays, BookOpen, Users, Settings } from "lucide-react";
 import { useSession, useActiveOrganization, signOut, authClient } from "@/lib/auth-client";
 
 interface AppTopbarProps {
@@ -179,16 +179,50 @@ export function AppTopbar({ onOpenCommand }: AppTopbarProps) {
               </div>
 
               <button
-                onClick={() => router.push("/settings/team")}
-                className="w-full text-left px-3 py-1.5 text-slate-700 hover:bg-slate-50 text-xs flex items-center gap-2"
+                onClick={() => router.push("/settings/clinic")}
+                className="w-full text-left px-3 py-1.5 text-slate-700 hover:bg-slate-50 text-xs flex items-center gap-2 cursor-pointer"
               >
+                <Building2 className="h-3.5 w-3.5 text-slate-400" />
+                <span>Clinic Profile</span>
+              </button>
+
+              <button
+                onClick={() => router.push("/settings/schedules")}
+                className="w-full text-left px-3 py-1.5 text-slate-700 hover:bg-slate-50 text-xs flex items-center gap-2 cursor-pointer"
+              >
+                <CalendarDays className="h-3.5 w-3.5 text-slate-400" />
+                <span>Doctor Schedules</span>
+              </button>
+
+              <button
+                onClick={() => router.push("/settings/catalog")}
+                className="w-full text-left px-3 py-1.5 text-slate-700 hover:bg-slate-50 text-xs flex items-center gap-2 cursor-pointer"
+              >
+                <BookOpen className="h-3.5 w-3.5 text-slate-400" />
+                <span>Master Catalog</span>
+              </button>
+
+              <button
+                onClick={() => router.push("/settings/team")}
+                className="w-full text-left px-3 py-1.5 text-slate-700 hover:bg-slate-50 text-xs flex items-center gap-2 cursor-pointer"
+              >
+                <Users className="h-3.5 w-3.5 text-slate-400" />
                 <span>Team & Roles</span>
               </button>
 
               <button
-                onClick={() => router.push("/onboarding")}
-                className="w-full text-left px-3 py-1.5 text-slate-700 hover:bg-slate-50 text-xs flex items-center gap-2"
+                onClick={() => router.push("/settings")}
+                className="w-full text-left px-3 py-1.5 text-slate-700 hover:bg-slate-50 text-xs flex items-center gap-2 cursor-pointer"
               >
+                <Settings className="h-3.5 w-3.5 text-slate-400" />
+                <span>Letterhead & Print</span>
+              </button>
+
+              <button
+                onClick={() => router.push("/onboarding")}
+                className="w-full text-left px-3 py-1.5 text-slate-700 hover:bg-slate-50 text-xs flex items-center gap-2 cursor-pointer"
+              >
+                <Plus className="h-3.5 w-3.5 text-slate-400" />
                 <span>Create / Switch Clinic</span>
               </button>
 

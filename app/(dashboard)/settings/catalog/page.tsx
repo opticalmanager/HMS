@@ -13,6 +13,7 @@ import {
   Filter,
   Sparkles,
 } from "lucide-react";
+import { SettingsNav } from "@/components/shell/SettingsNav";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -228,44 +229,11 @@ export default function MasterCatalogPage() {
 
   return (
     <div className="space-y-4 max-w-6xl mx-auto">
-      {/* Subnavigation Bar */}
-      <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-        <div>
-          <h1 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-            <BookOpen className="h-5 w-5 text-blue-600" />
-            Master Catalog & Clinical Tariffs
-          </h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Standard drug formulary and service tariff charge master with pg_trgm fuzzy matching
-          </p>
-        </div>
-        <div className="flex items-center gap-1.5 text-xs">
-          <Link
-            href="/settings/clinic"
-            className="px-2.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-100 font-medium"
-          >
-            Clinic Profile
-          </Link>
-          <Link
-            href="/settings/schedules"
-            className="px-2.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-100 font-medium"
-          >
-            Doctor Schedules
-          </Link>
-          <Link
-            href="/settings/catalog"
-            className="px-2.5 py-1.5 rounded-md bg-blue-50 text-blue-700 font-medium border border-blue-200"
-          >
-            Master Catalog
-          </Link>
-          <Link
-            href="/settings/team"
-            className="px-2.5 py-1.5 rounded-md text-slate-600 hover:bg-slate-100 font-medium"
-          >
-            Staff & Team
-          </Link>
-        </div>
-      </div>
+      {/* Unified Settings Navigation Header */}
+      <SettingsNav
+        title="Master Catalog & Clinical Tariffs"
+        description="Standard prescription drug formulary and service tariff charge master with pg_trgm fuzzy matching"
+      />
 
       {/* Primary Toolbar: Tabs, Fuzzy Search Bar, and Add Buttons */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">

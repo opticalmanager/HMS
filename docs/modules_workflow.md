@@ -17,12 +17,20 @@
    - Dedicated invitation acceptance screen displaying hospital name, invited email, designated RBAC role badge, and role capability descriptions.
    - One-click acceptance (`acceptInvitation`) activates the clinic membership (`setActive`) and routes directly to `/dashboard`.
    - One-click decline (`rejectInvitation`) safely voids the invitation and returns to `/dashboard`.
-4. **Team & RBAC Management (`/dashboard/settings/team`)**:
+4. **Team & RBAC Management (`/settings/team`)**:
    - Restricted to `owner` and `admin` roles.
    - Real-time role promotions/demotions with sole-owner protection (cannot demote or remove the sole owner).
    - Owner hierarchy enforcement: administrative staff cannot demote or remove hospital owners; only owners possess owner-level management privileges.
    - Copyable dev invitation acceptance links and invitation cancellation.
-5. **Multi-Origin & Reverse Proxy Resilience**:
+5. **Operational Settings Hub & Unified Navigation (`/settings`)**:
+   - Comprehensive Settings Hub providing multi-channel operational management across 5 dedicated panels:
+     - **Clinic Profile (`/settings/clinic`)**: Timezone, slot duration, WABA ID, broadcast webhook, and AES-256-GCM encrypted API key.
+     - **Doctor Schedules & Availability (`/settings/schedules`)**: Weekly doctor shift recurring hours, slot durations, and temporary doctor slot blocks.
+     - **Master Catalog & Tariffs (`/settings/catalog`)**: Formularies for prescription drugs (`medicine_master`) with `pg_trgm` fuzzy matching, and clinic service tariffs (`service_tariffs`) with GST calculations.
+     - **Clinic Staff & RBAC (`/settings/team`)**: Staff membership, invitation status, and role management.
+     - **Hospital Branding & Letterhead (`/settings`)**: A4 letterhead designer, document sequence codes, branch GSTIN, and ABDM gateway.
+   - All 5 panels are unified via `components/shell/SettingsNav.tsx` (1-click tab switching), linked via the sidebar settings sub-navigation tree, indexed in the `Ctrl+K` Global Command Palette, and accessible via the Topbar user profile dropdown.
+6. **Multi-Origin & Reverse Proxy Resilience**:
    - `lib/auth.ts` dynamically validates incoming request origins against trusted local patterns (`localhost:*`, `127.0.0.1:*`, private LAN subnets) and production domains, eliminating `Invalid origin` rejections across reverse proxies, Docker standalone environments, and local dev ports.
 
 ---

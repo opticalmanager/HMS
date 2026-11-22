@@ -18,6 +18,12 @@ import {
   Receipt,
   Pill,
   Tv,
+  Building2,
+  CalendarDays,
+  BookOpen,
+  Users,
+  Printer,
+  Settings,
 } from "lucide-react";
 
 interface CommandPaletteProps {
@@ -52,6 +58,11 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
     { label: "Book Patient Appointment", desc: "Doctor slots & token allocation", href: "/appointments", icon: Calendar },
     { label: "Billing & Cash Counter", desc: "OPD/IPD invoices & thermal receipts", href: "/billing", icon: Receipt },
     { label: "Pharmacy Stock & Expiry", desc: "Medicine batches & reorder alerts", href: "/inventory", icon: Pill },
+    { label: "Clinic Profile & AI Settings", desc: "Timezone, slot durations, WABA ID, broadcast webhook", href: "/settings/clinic", icon: Building2 },
+    { label: "Doctor Schedules & Blocks", desc: "Weekly consultation shifts, slot durations & leave blocks", href: "/settings/schedules", icon: CalendarDays },
+    { label: "Master Catalog & Tariffs", desc: "Prescription drug master (pg_trgm) & service pricing", href: "/settings/catalog", icon: BookOpen },
+    { label: "Staff & Team Roles (RBAC)", desc: "Invite members, manage doctor/admin roles & permissions", href: "/settings/team", icon: Users },
+    { label: "System Settings & Letterhead", desc: "Hospital branding, letterhead designer & sequences", href: "/settings", icon: Settings },
   ];
 
   const filtered = QUICK_ACTIONS.filter(

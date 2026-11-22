@@ -122,3 +122,11 @@ Before marking any task complete, verify and report:
      - **System architecture, external services, or core stack:** Update `docs/architecture.md` and `docs/tech_stack.md`.
      - **Overall project status & module completion:** Update `docs/overview.md`.
    - Never consider a feature complete until its corresponding documentation in `docs/` has been updated to maintain an accurate project audit trail.
+6. **Mandatory Navigation Exposure for Every Screen (Zero Orphan Pages Rule)**:
+   - Whenever any new screen or sub-route is implemented in `app/`, it is strictly prohibited to leave it as an orphan URL accessible only by typing the address bar.
+   - Every new route MUST simultaneously be wired into:
+     1. **The primary sidebar navigation (`AppSidebar.tsx`)**: Either as a top-level module or nested under an expandable active parent tree.
+     2. **The module's shared sub-navigation/tab bar (`SettingsNav.tsx` or parent module tab strip)**: Permitting 1-click horizontal switching between all sibling subpages.
+     3. **The Global Command Palette (`CommandPalette.tsx` / `Ctrl+K`)**: With search keywords and descriptions.
+     4. **The Topbar user menu (`AppTopbar.tsx`) or parent dashboard quick action cards**.
+   - No task touching UI routes may be marked complete without verifying that users can reach the page in 1–2 clicks from anywhere in the application.

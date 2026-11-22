@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/dialog";
 import { authClient, organization, useSession } from "@/lib/auth-client";
 import { toast } from "sonner";
+import { SettingsNav } from "@/components/shell/SettingsNav";
 
 interface MemberRecord {
   id: string;
@@ -250,21 +251,13 @@ export default function TeamSettingsPage() {
   }
 
   return (
-    <div className="space-y-4">
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
-        <div>
-          <h1 className="text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
-            <Users className="h-5 w-5 text-[#2563EB]" />
-            Clinic Staff & Role-Based Access Control (RBAC)
-          </h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Manage authorized healthcare personnel, clinical roles, and invitations for{" "}
-            <span className="font-semibold text-slate-700">{orgDetails?.name || "Active Clinic"}</span>
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
+    <div className="space-y-4 max-w-6xl mx-auto">
+      {/* Unified Settings Navigation Header */}
+      <SettingsNav
+        title="Clinic Staff & Role-Based Access Control (RBAC)"
+        description={`Manage authorized healthcare personnel, clinical roles, and invitations for ${orgDetails?.name || "Active Clinic"}`}
+        action={
+          <div className="flex items-center gap-2">
           <Button
             variant="outline"
             size="sm"
@@ -375,7 +368,8 @@ export default function TeamSettingsPage() {
             </DialogContent>
           </Dialog>
         </div>
-      </div>
+      }
+    />
 
       {/* Role Summary Badges Banner */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

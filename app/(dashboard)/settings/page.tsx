@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import {
   Building2,
   Printer,
@@ -13,7 +14,13 @@ import {
   AlertCircle,
   Plus,
   Trash2,
+  CalendarDays,
+  BookOpen,
+  Users,
+  ArrowUpRight,
+  Sparkles,
 } from "lucide-react";
+import { SettingsNav } from "@/components/shell/SettingsNav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -120,23 +127,119 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Top Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Hospital System Settings</h1>
-          <p className="text-xs text-slate-500">
-            Hospital branding, branch configuration, GSTIN validator, live letterhead designer, and service catalog
-          </p>
-        </div>
+    <div className="space-y-4 max-w-6xl mx-auto">
+      {/* Unified Settings Navigation Header */}
+      <SettingsNav
+        title="Hospital Branding & Print Settings"
+        description="Configure hospital letterhead designer, document sequences, branch GSTIN, and ABDM health gateway"
+        action={
+          <Button
+            onClick={handleSaveAll}
+            className="bg-[#2563EB] hover:bg-blue-700 text-xs gap-1.5 font-bold cursor-pointer"
+          >
+            {saved ? <CheckCircle className="h-3.5 w-3.5" /> : <Save className="h-3.5 w-3.5" />}
+            {saved ? "Settings Saved Successfully!" : "Save All Changes"}
+          </Button>
+        }
+      />
 
-        <Button
-          onClick={handleSaveAll}
-          className="bg-[#2563EB] hover:bg-blue-700 text-xs gap-1.5 font-bold"
+      {/* Operational Settings Hub (Quick Navigation Grid) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <Link
+          href="/settings/clinic"
+          className="group p-3.5 rounded-lg border border-slate-200 bg-white hover:border-blue-400 hover:shadow-xs transition-all text-left flex flex-col justify-between"
         >
-          {saved ? <CheckCircle className="h-3.5 w-3.5" /> : <Save className="h-3.5 w-3.5" />}
-          {saved ? "Settings Saved Successfully!" : "Save All Changes"}
-        </Button>
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <div className="h-8 w-8 rounded-md bg-blue-50 text-[#2563EB] flex items-center justify-center group-hover:bg-[#2563EB] group-hover:text-white transition-colors">
+                <Building2 className="h-4 w-4" />
+              </div>
+              <ArrowUpRight className="h-3.5 w-3.5 text-slate-400 group-hover:text-[#2563EB] transition-colors" />
+            </div>
+            <h3 className="text-xs font-bold text-slate-900 group-hover:text-[#2563EB] transition-colors">
+              Clinic Profile
+            </h3>
+            <p className="text-[11px] text-slate-500 mt-1 line-clamp-2">
+              Timezone, default slot duration, WABA ID, and webhook secrets.
+            </p>
+          </div>
+          <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400">
+            <span>Operating Profile</span>
+            <span className="font-semibold text-blue-600">Configure &rarr;</span>
+          </div>
+        </Link>
+
+        <Link
+          href="/settings/schedules"
+          className="group p-3.5 rounded-lg border border-slate-200 bg-white hover:border-blue-400 hover:shadow-xs transition-all text-left flex flex-col justify-between"
+        >
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <div className="h-8 w-8 rounded-md bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                <CalendarDays className="h-4 w-4" />
+              </div>
+              <ArrowUpRight className="h-3.5 w-3.5 text-slate-400 group-hover:text-emerald-600 transition-colors" />
+            </div>
+            <h3 className="text-xs font-bold text-slate-900 group-hover:text-emerald-600 transition-colors">
+              Doctor Schedules
+            </h3>
+            <p className="text-[11px] text-slate-500 mt-1 line-clamp-2">
+              Weekly consultation shifts, slot durations & leave blocks.
+            </p>
+          </div>
+          <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400">
+            <span>Concurrency Locks</span>
+            <span className="font-semibold text-emerald-600">Manage &rarr;</span>
+          </div>
+        </Link>
+
+        <Link
+          href="/settings/catalog"
+          className="group p-3.5 rounded-lg border border-slate-200 bg-white hover:border-blue-400 hover:shadow-xs transition-all text-left flex flex-col justify-between"
+        >
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <div className="h-8 w-8 rounded-md bg-purple-50 text-purple-600 flex items-center justify-center group-hover:bg-purple-600 group-hover:text-white transition-colors">
+                <BookOpen className="h-4 w-4" />
+              </div>
+              <ArrowUpRight className="h-3.5 w-3.5 text-slate-400 group-hover:text-purple-600 transition-colors" />
+            </div>
+            <h3 className="text-xs font-bold text-slate-900 group-hover:text-purple-600 transition-colors">
+              Master Catalog
+            </h3>
+            <p className="text-[11px] text-slate-500 mt-1 line-clamp-2">
+              Prescription drug master with pg_trgm fuzzy search & tariffs.
+            </p>
+          </div>
+          <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400">
+            <span>Formulary & Prices</span>
+            <span className="font-semibold text-purple-600">Browse &rarr;</span>
+          </div>
+        </Link>
+
+        <Link
+          href="/settings/team"
+          className="group p-3.5 rounded-lg border border-slate-200 bg-white hover:border-blue-400 hover:shadow-xs transition-all text-left flex flex-col justify-between"
+        >
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <div className="h-8 w-8 rounded-md bg-amber-50 text-amber-600 flex items-center justify-center group-hover:bg-amber-600 group-hover:text-white transition-colors">
+                <Users className="h-4 w-4" />
+              </div>
+              <ArrowUpRight className="h-3.5 w-3.5 text-slate-400 group-hover:text-amber-600 transition-colors" />
+            </div>
+            <h3 className="text-xs font-bold text-slate-900 group-hover:text-amber-600 transition-colors">
+              Staff & Team RBAC
+            </h3>
+            <p className="text-[11px] text-slate-500 mt-1 line-clamp-2">
+              Staff invitations, 4 clinical roles, and permission controls.
+            </p>
+          </div>
+          <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400">
+            <span>Access Control</span>
+            <span className="font-semibold text-amber-600">Manage &rarr;</span>
+          </div>
+        </Link>
       </div>
 
       <Tabs defaultValue="letterhead" className="space-y-4">
