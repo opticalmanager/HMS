@@ -3,6 +3,7 @@
  */
 
 export * from "./organizations";
+export * from "./auth";
 export * from "./branches";
 export * from "./profiles";
 export * from "./patients";
@@ -17,6 +18,7 @@ export * from "./audit";
 
 import { relations } from "drizzle-orm";
 import { organizations } from "./organizations";
+import { member, invitation } from "./auth";
 import { branches } from "./branches";
 import { profiles } from "./profiles";
 import { patients } from "./patients";
@@ -34,6 +36,8 @@ export const organizationsRelations = relations(organizations, ({ many }) => ({
   branches: many(branches),
   profiles: many(profiles),
   patients: many(patients),
+  members: many(member),
+  invitations: many(invitation),
 }));
 
 // Branch Relations

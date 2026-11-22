@@ -3,8 +3,11 @@ import { pgTable, text, timestamp, boolean, uuid } from "drizzle-orm/pg-core";
 export const organizations = pgTable("organizations", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: text("name").notNull(),
+  slug: text("slug").unique(),
+  logo: text("logo"),
+  metadata: text("metadata"),
   legalName: text("legal_name"),
-  code: text("code").notNull().unique(), // e.g. "APEX"
+  code: text("code"), // e.g. "APEX"
   logoUrl: text("logo_url"),
   primaryContactPhone: text("primary_contact_phone"),
   primaryContactEmail: text("primary_contact_email"),

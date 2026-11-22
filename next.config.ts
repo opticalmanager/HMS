@@ -7,6 +7,14 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "15mb",
     },
   },
+  async rewrites() {
+    return [
+      {
+        source: "/dashboard/settings/team",
+        destination: "/settings/team",
+      },
+    ];
+  },
   async headers() {
     return [
       {
