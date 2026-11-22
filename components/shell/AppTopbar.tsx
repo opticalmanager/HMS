@@ -2,8 +2,8 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Search, Building2, User, LogOut, ChevronDown } from "lucide-react";
-import { useSession, useActiveOrganization, signOut } from "@/lib/auth-client";
+import { Search, Building2, User, LogOut, ChevronDown, Check, Plus } from "lucide-react";
+import { useSession, useActiveOrganization, signOut, authClient } from "@/lib/auth-client";
 
 interface AppTopbarProps {
   onOpenCommand?: () => void;
@@ -17,6 +17,41 @@ export function AppTopbar({ onOpenCommand }: AppTopbarProps) {
   const { data: session } = useSession();
   const { data: activeOrg } = useActiveOrganization();
   const [menuOpen, setMenuOpen] = React.useState(false);
+  const [orgDropdownOpen, setOrgDropdownOpen] = React.useState(false);
+  const [userOrgs, setUserOrgs] = React.useState<Array<{ id: string; name: string; slug?: string }>>([]);
+  const [switchingOrg, setSwitchingOrg] = React.useState(false);
+
+  const loadOrganizations = React.useCallback(async () => {
+    try {
+      const res = await authClient.organization.list();
+      if (res.data) {
+        setUserOrgs(res.data);
+      }
+    } catch {
+      // Ignore
+    }
+  }, []);
+
+  React.useEffect(() => {
+    loadOrganizations();
+  }, [loadOrganizations]);
+
+  const handleSwitchOrg = async (orgId: string) => {
+    if (orgId === activeOrg?.id) {
+      setOrgDropdownOpen(false);
+      return;
+    }
+    try {
+      setSwitchingOrg(true);
+      await authClient.organization.setActive({ organizationId: orgId });
+      setOrgDropdownOpen(false);
+      router.refresh();
+    } catch (err) {
+      console.error("Failed to switch clinic organization:", err);
+    } finally {
+      setSwitchingOrg(false);
+    }
+  };
 
   const handleSignOut = async () => {
     try {
@@ -49,10 +84,65 @@ export function AppTopbar({ onOpenCommand }: AppTopbarProps) {
       </div>
 
       <div className="flex items-center gap-3 relative">
-        {/* Branch / Clinic Switcher Indicator */}
-        <div className="hidden sm:flex items-center gap-1.5 text-[11px] font-medium text-slate-600 bg-slate-100 px-2.5 py-1 rounded-md">
-          <Building2 className="h-3.5 w-3.5 text-[#2563EB]" />
-          <span className="max-w-[140px] truncate">{orgName}</span>
+        {/* Interactive Clinic Switcher Dropdown */}
+        <div className="relative">
+          <button
+            onClick={() => {
+              setOrgDropdownOpen(!orgDropdownOpen);
+              if (!orgDropdownOpen) loadOrganizations();
+            }}
+            className="flex items-center gap-1.5 text-[11px] font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 px-2.5 py-1.5 rounded-md border border-slate-200 transition-colors cursor-pointer"
+            title="Switch Clinic Organization"
+          >
+            <Building2 className="h-3.5 w-3.5 text-[#2563EB] shrink-0" />
+            <span className="max-w-[130px] truncate">{orgName}</span>
+            <ChevronDown className="h-3 w-3 text-slate-500 shrink-0" />
+          </button>
+
+          {orgDropdownOpen && (
+            <div
+              className="absolute left-0 sm:right-0 sm:left-auto top-10 w-56 bg-white border border-slate-200 shadow-xl rounded-lg py-1 z-50 text-xs"
+              onMouseLeave={() => setOrgDropdownOpen(false)}
+            >
+              <div className="px-3 py-1.5 border-b border-slate-100 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                Switch Clinic Tenant
+              </div>
+              <div className="max-h-48 overflow-y-auto py-1">
+                {userOrgs.length === 0 ? (
+                  <div className="px-3 py-2 text-slate-400 text-[11px]">No other clinics found</div>
+                ) : (
+                  userOrgs.map((org) => {
+                    const isActive = org.id === activeOrg?.id;
+                    return (
+                      <button
+                        key={org.id}
+                        onClick={() => handleSwitchOrg(org.id)}
+                        disabled={switchingOrg}
+                        className={`w-full text-left px-3 py-1.5 flex items-center justify-between hover:bg-slate-50 text-xs ${
+                          isActive ? "font-semibold text-[#2563EB] bg-blue-50/50" : "text-slate-700"
+                        }`}
+                      >
+                        <span className="truncate max-w-[170px]">{org.name}</span>
+                        {isActive && <Check className="h-3.5 w-3.5 text-[#2563EB] shrink-0" />}
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+              <div className="border-t border-slate-100 pt-1">
+                <button
+                  onClick={() => {
+                    setOrgDropdownOpen(false);
+                    router.push("/onboarding");
+                  }}
+                  className="w-full text-left px-3 py-1.5 text-xs text-blue-600 hover:bg-blue-50 flex items-center gap-1.5 font-medium"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Register New Clinic</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* User Mini Profile with Sign Out Toggle */}

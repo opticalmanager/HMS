@@ -2,13 +2,32 @@
 
 ## 1. Executive Summary
 
-**Apex HMS & Clinical EMR** is an enterprise-grade, high-density, monolithic Hospital Management System and Electronic Medical Record designed to deliver zero-latency clinical operations, streamline multi-department communication, and comply with the national healthcare standards established by the **National Health Authority (NHA)** under the **Ayushman Bharat Digital Mission (ABDM)**.
+**Apex HMS & Clinical EMR** is an enterprise-grade, high-density, multi-tenant Monolithic Hospital Management System and Electronic Medical Record designed to deliver zero-latency clinical operations, streamline multi-department communication, and comply with the national healthcare standards established by the **National Health Authority (NHA)** under the **Ayushman Bharat Digital Mission (ABDM)**.
 
-The system is directly inspired by comprehensive workflow scans of **Healthray** (`ray.healthray.com`) and leverages the battle-tested, high-density SaaS foundation engineered in `optical-manager`.
+The architecture strictly enforces multi-tenancy (`1 Organization = 1 Clinic`) via **Better Auth**, server-side session guards (`requireClinicSession`), and comprehensive compound query isolation.
 
 ---
 
-## 2. The 12 Monolithic Modules
+## 2. Multi-Tenant Architecture & Auth (Phase B Active)
+
+1. **Authentication Engine**: Better Auth with revocable server sessions, secure cookie management (`nextCookies()`), and full VPS reverse proxy compatibility (`useSecureCookies`).
+2. **Clinic Isolation**:
+   - Every clinic is an isolated `organization` tenant with dedicated members and invitations.
+   - All 16 database tables include mandatory `organization_id` foreign keys backed by explicit B-Tree indexes.
+   - Zero client trust: `clinicId` is derived exclusively on the server from the verified session.
+3. **Role-Based Access Control**:
+   - 4 Clinic Roles: `owner`, `admin`, `doctor`, `receptionist`.
+   - 9 Domain Statements: `clinic`, `team`, `patient`, `appointment`, `schedule`, `prescription`, `billing`, `knowledge`, `aiSettings`.
+4. **Staff Management & Onboarding**:
+   - `/onboarding`: Interactive clinic organization creation and auto-activation.
+   - Interactive Clinic Switcher in `AppTopbar` to jump seamlessly across multiple memberships.
+   - `/dashboard/settings/team`: Owner/Admin team management panel with role promotion/demotion, member removals, invitation cancellation, and dev invitation link generation.
+   - `/accept-invitation/[id]`: Dedicated staff invitation acceptance screen.
+5. **IDOR Hardening**: Compound entity queries on `/api/crm/appointments/[id]` and `/api/crm/patients/[id]` preventing cross-tenant leakage.
+
+---
+
+## 3. The 12 Monolithic Modules
 
 | # | Module | Operational Focus | Key Features |
 |---|---|---|---|
@@ -27,21 +46,11 @@ The system is directly inspired by comprehensive workflow scans of **Healthray**
 
 ---
 
-## 3. High-Density Clinical Philosophy
+## 4. High-Density Clinical Philosophy
 
 Clinical environments differ fundamentally from consumer web apps. Doctors, triage nurses, and hospital receptionists operate under severe time constraints where latency, excessive modal clicks, and mouse reliance cause dangerous bottlenecks.
 
 1. **Anti-Fluff, High-Density Information Display**: Maximum clinically relevant data per square inch with compact typography and clean borders.
-2. **Industrial Enter-as-Tab Navigation**: High-speed keyboard data entry replicating POS systems (Tally, Marg) allowing staff to fill forms without touching the mouse.
+2. **Industrial Enter-as-Tab Navigation**: High-speed keyboard data entry replicating POS systems allowing staff to fill forms without touching the mouse.
 3. **Zero-Latency In-Memory Lookups**: Instant autocomplete for ICD-10 diagnosis codes and frequent medicines.
-4. **Resilient Offline Fallback**: Hospital LANs frequently encounter internet drops. The system caches patient records in Dexie.js (IndexedDB) and validates offline user sessions via HMAC-SHA256 signatures.
-
----
-
-## 4. Production Readiness & Clean Data Lifecycle
-
-In production mode, the application operates with clean, zero-mock isolation:
-1. **Empty Initial Operational State**: The clinical store boots with clean empty collections (`patients: []`, `appointments: []`, `invoices: []`, `admissions: []`, `nursingMar: []`, `whatsappLogs: []`, `auditLogs: []`, `doctorBlocks: []`, `patientAllergies: []`). Standard hospital ward beds initialize in vacant status.
-2. **Dynamic UI Aggregations**: Dashboard charts, KPI summaries, and Doctor Productivity tables aggregate dynamically from live store collections, rendering clean empty states (`₹0` or `0 pts`) when no records exist.
-3. **Form Cleanliness**: Invoice builders, bed allocation modals, appointment booking modals, and registration sheets open blank without pre-baked patient or doctor identities, with keyboard-navigable autocomplete for registered clinic records.
-4. **Demo Data Management**: Automated test suites and staging environments invoke `clinicalStore.seedDemoData()` on-demand, preserving 100% automated test coverage while keeping production deployments clean.
+4. **Resilient Offline Fallback**: Caches records in Dexie.js (IndexedDB) and validates offline sessions via HMAC-SHA256 signatures.

@@ -3,7 +3,7 @@ import { z } from "zod";
 import { eq, desc } from "drizzle-orm";
 import { db } from "@/lib/drizzle";
 import { patients } from "@/db/schema/patients";
-import { requireClinicSession, ClinicAuthError } from "@/lib/auth-guard";
+import { requireClinicSession, handleAuthError } from "@/lib/auth-guard";
 
 const createPatientSchema = z.object({
   fullName: z.string().min(2, "Full name must be at least 2 characters"),
@@ -40,16 +40,7 @@ export async function GET(request: NextRequest) {
       patients: data,
     });
   } catch (error) {
-    if (error instanceof ClinicAuthError) {
-      return NextResponse.json(
-        { success: false, error: error.message, code: error.code },
-        { status: error.status }
-      );
-    }
-    return NextResponse.json(
-      { success: false, error: "Internal server error fetching patients" },
-      { status: 500 }
-    );
+    return handleAuthError(error);
   }
 }
 
@@ -103,15 +94,6 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
-    if (error instanceof ClinicAuthError) {
-      return NextResponse.json(
-        { success: false, error: error.message, code: error.code },
-        { status: error.status }
-      );
-    }
-    return NextResponse.json(
-      { success: false, error: "Internal server error creating patient" },
-      { status: 500 }
-    );
+    return handleAuthError(error);
   }
 }

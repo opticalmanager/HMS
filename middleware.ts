@@ -3,9 +3,21 @@ import { getSessionCookie } from "better-auth/cookies";
 
 export async function middleware(request: NextRequest) {
   const sessionCookie = getSessionCookie(request);
-  const { pathname } = request.nextUrl;
+  const { pathname, search } = request.nextUrl;
 
-  // Unauthenticated requests
+  const isAuthPage = pathname === "/login" || pathname === "/signup";
+
+  // Authenticated users visiting login/signup should be redirected to dashboard
+  if (sessionCookie && isAuthPage) {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+
+  // Allow unauthenticated access to login and signup pages
+  if (isAuthPage) {
+    return NextResponse.next();
+  }
+
+  // Unauthenticated requests to protected paths
   if (!sessionCookie) {
     if (pathname.startsWith("/api/crm")) {
       return NextResponse.json(
@@ -15,7 +27,7 @@ export async function middleware(request: NextRequest) {
     }
 
     const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("callbackUrl", pathname);
+    loginUrl.searchParams.set("next", `${pathname}${search}`);
     return NextResponse.redirect(loginUrl);
   }
 
@@ -24,7 +36,12 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
+    "/login",
+    "/signup",
     "/dashboard/:path*",
+    "/onboarding",
+    "/accept-invitation/:path*",
+    "/api/crm/:path*",
     "/appointments/:path*",
     "/opd/:path*",
     "/ipd/:path*",
@@ -36,7 +53,5 @@ export const config = {
     "/token-board/:path*",
     "/audit-logs/:path*",
     "/settings/:path*",
-    "/onboarding/:path*",
-    "/api/crm/:path*",
   ],
 };

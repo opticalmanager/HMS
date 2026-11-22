@@ -1,7 +1,15 @@
 import { describe, it } from "node:test";
 import assert from "node:assert";
 import { ac, ownerRole, adminRole, doctorRole, receptionistRole, clinicRoles } from "../lib/auth-permissions";
-import { requireClinicSession, ClinicAuthError } from "../lib/auth-guard";
+import {
+  requireClinicSession,
+  requirePageSession,
+  handleAuthError,
+  ClinicAuthError,
+  UnauthorizedError,
+  NoActiveClinicError,
+  ForbiddenError,
+} from "../lib/auth-guard";
 import { auth } from "../lib/auth";
 import * as authRouteHandler from "../app/api/auth/[...all]/route";
 
@@ -11,80 +19,87 @@ describe("Better Auth Multi-Tenant RBAC & Clinical Access Control Suite", () => 
       // Organization lifecycle
       assert.strictEqual(ownerRole.authorize({ organization: ["update"] }).success, true);
       assert.strictEqual(ownerRole.authorize({ organization: ["delete"] }).success, true);
+      assert.strictEqual(ownerRole.authorize({ clinic: ["read", "update", "delete"] }).success, true);
 
       // Team & member management
-      assert.strictEqual(ownerRole.authorize({ member: ["create"] }).success, true);
-      assert.strictEqual(ownerRole.authorize({ invitation: ["create"] }).success, true);
+      assert.strictEqual(ownerRole.authorize({ member: ["create", "update", "delete"] }).success, true);
+      assert.strictEqual(ownerRole.authorize({ invitation: ["create", "cancel"] }).success, true);
+      assert.strictEqual(ownerRole.authorize({ team: ["read", "invite", "update_role", "remove"] }).success, true);
 
       // Clinical operations
-      assert.strictEqual(ownerRole.authorize({ patient: ["create", "read", "update", "delete"] }).success, true);
-      assert.strictEqual(ownerRole.authorize({ appointment: ["create", "read", "update", "cancel"] }).success, true);
-      assert.strictEqual(ownerRole.authorize({ prescription: ["create", "read", "update", "approve"] }).success, true);
+      assert.strictEqual(ownerRole.authorize({ patient: ["read", "create", "update", "delete"] }).success, true);
+      assert.strictEqual(ownerRole.authorize({ appointment: ["read", "create", "update", "cancel"] }).success, true);
+      assert.strictEqual(ownerRole.authorize({ schedule: ["read", "manage_own", "manage_all"] }).success, true);
+      assert.strictEqual(ownerRole.authorize({ prescription: ["read", "draft", "approve"] }).success, true);
 
       // Billing & tariffs
-      assert.strictEqual(ownerRole.authorize({ billing: ["create", "read", "update", "delete"] }).success, true);
+      assert.strictEqual(ownerRole.authorize({ billing: ["read", "draft", "issue", "void"] }).success, true);
 
-      // Settings, API keys & AI
-      assert.strictEqual(ownerRole.authorize({ settings: ["read", "update"] }).success, true);
-      assert.strictEqual(ownerRole.authorize({ apiKey: ["create", "read", "delete"] }).success, true);
-      assert.strictEqual(ownerRole.authorize({ ai: ["dictate", "chat", "settings"] }).success, true);
+      // Knowledge & AI settings
+      assert.strictEqual(ownerRole.authorize({ knowledge: ["read", "manage"] }).success, true);
+      assert.strictEqual(ownerRole.authorize({ aiSettings: ["read", "manage"] }).success, true);
     });
 
-    it("admin can manage operations and team, but CANNOT delete organization or prescribe", () => {
+    it("admin can manage operations and team, but CANNOT delete organization, delete clinic, or approve prescriptions", () => {
       // Allowed admin actions
       assert.strictEqual(adminRole.authorize({ organization: ["update"] }).success, true);
       assert.strictEqual(adminRole.authorize({ member: ["create", "update", "delete"] }).success, true);
       assert.strictEqual(adminRole.authorize({ invitation: ["create", "cancel"] }).success, true);
-      assert.strictEqual(adminRole.authorize({ patient: ["create", "read", "update"] }).success, true);
-      assert.strictEqual(adminRole.authorize({ appointment: ["create", "read", "update", "cancel"] }).success, true);
-      assert.strictEqual(adminRole.authorize({ billing: ["create", "read", "update", "delete"] }).success, true);
-      assert.strictEqual(adminRole.authorize({ settings: ["read", "update"] }).success, true);
-      assert.strictEqual(adminRole.authorize({ apiKey: ["create", "read", "delete"] }).success, true);
-      assert.strictEqual(adminRole.authorize({ ai: ["chat"] }).success, true);
+      assert.strictEqual(adminRole.authorize({ clinic: ["read", "update"] }).success, true);
+      assert.strictEqual(adminRole.authorize({ team: ["read", "invite", "update_role", "remove"] }).success, true);
+      assert.strictEqual(adminRole.authorize({ patient: ["read", "create", "update", "delete"] }).success, true);
+      assert.strictEqual(adminRole.authorize({ appointment: ["read", "create", "update", "cancel"] }).success, true);
+      assert.strictEqual(adminRole.authorize({ schedule: ["read", "manage_own", "manage_all"] }).success, true);
+      assert.strictEqual(adminRole.authorize({ prescription: ["read", "draft"] }).success, true);
+      assert.strictEqual(adminRole.authorize({ billing: ["read", "draft", "issue", "void"] }).success, true);
+      assert.strictEqual(adminRole.authorize({ knowledge: ["read", "manage"] }).success, true);
+      assert.strictEqual(adminRole.authorize({ aiSettings: ["read", "manage"] }).success, true);
 
       // Disallowed admin actions
       assert.strictEqual(adminRole.authorize({ organization: ["delete"] }).success, false);
-      assert.strictEqual(adminRole.authorize({ prescription: ["create"] }).success, false);
+      assert.strictEqual(adminRole.authorize({ clinic: ["delete"] }).success, false);
       assert.strictEqual(adminRole.authorize({ prescription: ["approve"] }).success, false);
-      assert.strictEqual(adminRole.authorize({ ai: ["dictate"] }).success, false);
-      assert.strictEqual(adminRole.authorize({ ai: ["settings"] }).success, false);
     });
 
-    it("doctor has clinical & prescription authority, but CANNOT manage team or delete clinic", () => {
+    it("doctor has clinical & prescription authority, but CANNOT manage team, delete clinic, or issue final bills", () => {
       // Allowed doctor actions
-      assert.strictEqual(doctorRole.authorize({ patient: ["create", "read", "update"] }).success, true);
-      assert.strictEqual(doctorRole.authorize({ appointment: ["create", "read", "update", "cancel"] }).success, true);
-      assert.strictEqual(doctorRole.authorize({ prescription: ["create", "read", "update", "approve"] }).success, true);
-      assert.strictEqual(doctorRole.authorize({ settings: ["read"] }).success, true);
-      assert.strictEqual(doctorRole.authorize({ ai: ["dictate", "chat"] }).success, true);
+      assert.strictEqual(doctorRole.authorize({ clinic: ["read"] }).success, true);
+      assert.strictEqual(doctorRole.authorize({ patient: ["read", "create", "update"] }).success, true);
+      assert.strictEqual(doctorRole.authorize({ appointment: ["read", "create", "update", "cancel"] }).success, true);
+      assert.strictEqual(doctorRole.authorize({ schedule: ["read", "manage_own"] }).success, true);
+      assert.strictEqual(doctorRole.authorize({ prescription: ["read", "draft", "approve"] }).success, true);
+      assert.strictEqual(doctorRole.authorize({ billing: ["read", "draft"] }).success, true);
+      assert.strictEqual(doctorRole.authorize({ knowledge: ["read"] }).success, true);
 
       // Disallowed doctor actions
-      assert.strictEqual(doctorRole.authorize({ organization: ["update"] }).success, false);
+      assert.strictEqual(doctorRole.authorize({ clinic: ["update"] }).success, false);
+      assert.strictEqual(doctorRole.authorize({ clinic: ["delete"] }).success, false);
       assert.strictEqual(doctorRole.authorize({ organization: ["delete"] }).success, false);
-      assert.strictEqual(doctorRole.authorize({ member: ["create"] }).success, false);
-      assert.strictEqual(doctorRole.authorize({ invitation: ["create"] }).success, false);
-      assert.strictEqual(doctorRole.authorize({ billing: ["create"] }).success, false);
-      assert.strictEqual(doctorRole.authorize({ billing: ["delete"] }).success, false);
-      assert.strictEqual(doctorRole.authorize({ settings: ["update"] }).success, false);
-      assert.strictEqual(doctorRole.authorize({ apiKey: ["create"] }).success, false);
-      assert.strictEqual(doctorRole.authorize({ ai: ["settings"] }).success, false);
+      assert.strictEqual(doctorRole.authorize({ team: ["invite"] }).success, false);
+      assert.strictEqual(doctorRole.authorize({ schedule: ["manage_all"] }).success, false);
+      assert.strictEqual(doctorRole.authorize({ billing: ["issue"] }).success, false);
+      assert.strictEqual(doctorRole.authorize({ billing: ["void"] }).success, false);
+      assert.strictEqual(doctorRole.authorize({ aiSettings: ["manage"] }).success, false);
     });
 
-    it("receptionist can register patients, book appointments, and collect bills, but CANNOT prescribe", () => {
+    it("receptionist can register patients, book appointments, and issue bills, but CANNOT prescribe", () => {
       // Allowed receptionist actions
-      assert.strictEqual(receptionistRole.authorize({ patient: ["create", "read", "update"] }).success, true);
-      assert.strictEqual(receptionistRole.authorize({ appointment: ["create", "read", "update", "cancel"] }).success, true);
-      assert.strictEqual(receptionistRole.authorize({ billing: ["create", "read"] }).success, true);
+      assert.strictEqual(receptionistRole.authorize({ clinic: ["read"] }).success, true);
+      assert.strictEqual(receptionistRole.authorize({ patient: ["read", "create", "update"] }).success, true);
+      assert.strictEqual(receptionistRole.authorize({ appointment: ["read", "create", "update", "cancel"] }).success, true);
+      assert.strictEqual(receptionistRole.authorize({ schedule: ["read"] }).success, true);
+      assert.strictEqual(receptionistRole.authorize({ billing: ["read", "draft", "issue"] }).success, true);
+      assert.strictEqual(receptionistRole.authorize({ knowledge: ["read"] }).success, true);
 
       // Disallowed receptionist actions
-      assert.strictEqual(receptionistRole.authorize({ prescription: ["create"] }).success, false);
+      assert.strictEqual(receptionistRole.authorize({ prescription: ["draft"] }).success, false);
       assert.strictEqual(receptionistRole.authorize({ prescription: ["approve"] }).success, false);
-      assert.strictEqual(receptionistRole.authorize({ billing: ["delete"] }).success, false);
-      assert.strictEqual(receptionistRole.authorize({ organization: ["update"] }).success, false);
-      assert.strictEqual(receptionistRole.authorize({ member: ["create"] }).success, false);
-      assert.strictEqual(receptionistRole.authorize({ settings: ["read"] }).success, false);
-      assert.strictEqual(receptionistRole.authorize({ apiKey: ["create"] }).success, false);
-      assert.strictEqual(receptionistRole.authorize({ ai: ["dictate"] }).success, false);
+      assert.strictEqual(receptionistRole.authorize({ schedule: ["manage_own"] }).success, false);
+      assert.strictEqual(receptionistRole.authorize({ schedule: ["manage_all"] }).success, false);
+      assert.strictEqual(receptionistRole.authorize({ billing: ["void"] }).success, false);
+      assert.strictEqual(receptionistRole.authorize({ team: ["invite"] }).success, false);
+      assert.strictEqual(receptionistRole.authorize({ clinic: ["update"] }).success, false);
+      assert.strictEqual(receptionistRole.authorize({ organization: ["delete"] }).success, false);
     });
 
     it("exports all 4 clinic roles in clinicRoles registry", () => {
@@ -119,7 +134,7 @@ describe("Better Auth Multi-Tenant RBAC & Clinical Access Control Suite", () => 
   });
 
   describe("requireClinicSession Guard & Security Invariants", () => {
-    it("rejects unauthenticated requests with ClinicAuthError (401)", async () => {
+    it("rejects unauthenticated requests with UnauthorizedError (401)", async () => {
       const emptyHeaders = new Headers();
       await assert.rejects(
         async () => {
@@ -129,9 +144,10 @@ describe("Better Auth Multi-Tenant RBAC & Clinical Access Control Suite", () => 
           });
         },
         (err: unknown) => {
+          assert.ok(err instanceof UnauthorizedError);
           assert.ok(err instanceof ClinicAuthError);
-          assert.strictEqual(err.status, 401);
-          assert.strictEqual(err.code, "UNAUTHENTICATED");
+          assert.strictEqual((err as ClinicAuthError).status, 401);
+          assert.strictEqual((err as ClinicAuthError).code, "UNAUTHENTICATED");
           return true;
         }
       );
@@ -147,7 +163,6 @@ describe("Better Auth Multi-Tenant RBAC & Clinical Access Control Suite", () => 
           });
         },
         (err: unknown) => {
-          // Next.js redirect throws an error with digest NEXT_REDIRECT
           assert.ok(err !== null && typeof err === "object");
           assert.ok("digest" in err || (err as Error).message.includes("NEXT_REDIRECT"));
           return true;
@@ -155,7 +170,7 @@ describe("Better Auth Multi-Tenant RBAC & Clinical Access Control Suite", () => 
       );
     });
 
-    it("rejects authenticated session with missing activeOrganizationId (403 NO_ACTIVE_CLINIC)", async () => {
+    it("rejects authenticated session with missing activeOrganizationId (409 NO_ACTIVE_CLINIC)", async () => {
       const mockSessionWithoutOrg = {
         user: { id: "u-1", email: "test@clinic.com", name: "Test User" },
         session: { id: "s-1", userId: "u-1", activeOrganizationId: null },
@@ -169,9 +184,10 @@ describe("Better Auth Multi-Tenant RBAC & Clinical Access Control Suite", () => 
           });
         },
         (err: unknown) => {
+          assert.ok(err instanceof NoActiveClinicError);
           assert.ok(err instanceof ClinicAuthError);
-          assert.strictEqual(err.status, 403);
-          assert.strictEqual(err.code, "NO_ACTIVE_CLINIC");
+          assert.strictEqual((err as ClinicAuthError).status, 409);
+          assert.strictEqual((err as ClinicAuthError).code, "NO_ACTIVE_CLINIC");
           return true;
         }
       );
@@ -213,9 +229,10 @@ describe("Better Auth Multi-Tenant RBAC & Clinical Access Control Suite", () => 
           });
         },
         (err: unknown) => {
+          assert.ok(err instanceof ForbiddenError);
           assert.ok(err instanceof ClinicAuthError);
-          assert.strictEqual(err.status, 403);
-          assert.strictEqual(err.code, "FORBIDDEN");
+          assert.strictEqual((err as ClinicAuthError).status, 403);
+          assert.strictEqual((err as ClinicAuthError).code, "FORBIDDEN");
           return true;
         }
       );
@@ -228,7 +245,7 @@ describe("Better Auth Multi-Tenant RBAC & Clinical Access Control Suite", () => 
       };
 
       // Allowed action
-      const result = await requireClinicSession({ prescription: ["create"] }, {
+      const result = await requireClinicSession({ prescription: ["approve"] }, {
         session: mockSession,
         role: "doctor",
         redirectIfUnauthorized: false,
@@ -236,6 +253,7 @@ describe("Better Auth Multi-Tenant RBAC & Clinical Access Control Suite", () => 
       assert.strictEqual(result.clinicId, "clinic-uuid-001");
       assert.strictEqual(result.role, "doctor");
       assert.strictEqual(result.user.id, "u-doc-1");
+      assert.ok(result.memberId);
 
       // Disallowed action
       await assert.rejects(
@@ -247,9 +265,10 @@ describe("Better Auth Multi-Tenant RBAC & Clinical Access Control Suite", () => 
           });
         },
         (err: unknown) => {
+          assert.ok(err instanceof ForbiddenError);
           assert.ok(err instanceof ClinicAuthError);
-          assert.strictEqual(err.status, 403);
-          assert.strictEqual(err.code, "FORBIDDEN");
+          assert.strictEqual((err as ClinicAuthError).status, 403);
+          assert.strictEqual((err as ClinicAuthError).code, "FORBIDDEN");
           return true;
         }
       );
@@ -273,16 +292,17 @@ describe("Better Auth Multi-Tenant RBAC & Clinical Access Control Suite", () => 
       // Disallowed action
       await assert.rejects(
         async () => {
-          await requireClinicSession({ prescription: ["create"] }, {
+          await requireClinicSession({ prescription: ["approve"] }, {
             session: mockSession,
             role: "receptionist",
             redirectIfUnauthorized: false,
           });
         },
         (err: unknown) => {
+          assert.ok(err instanceof ForbiddenError);
           assert.ok(err instanceof ClinicAuthError);
-          assert.strictEqual(err.status, 403);
-          assert.strictEqual(err.code, "FORBIDDEN");
+          assert.strictEqual((err as ClinicAuthError).status, 403);
+          assert.strictEqual((err as ClinicAuthError).code, "FORBIDDEN");
           return true;
         }
       );
@@ -306,16 +326,17 @@ describe("Better Auth Multi-Tenant RBAC & Clinical Access Control Suite", () => 
       // Disallowed action
       await assert.rejects(
         async () => {
-          await requireClinicSession({ organization: ["delete"] }, {
+          await requireClinicSession({ clinic: ["delete"] }, {
             session: mockSession,
             role: "admin",
             redirectIfUnauthorized: false,
           });
         },
         (err: unknown) => {
+          assert.ok(err instanceof ForbiddenError);
           assert.ok(err instanceof ClinicAuthError);
-          assert.strictEqual(err.status, 403);
-          assert.strictEqual(err.code, "FORBIDDEN");
+          assert.strictEqual((err as ClinicAuthError).status, 403);
+          assert.strictEqual((err as ClinicAuthError).code, "FORBIDDEN");
           return true;
         }
       );
@@ -327,7 +348,7 @@ describe("Better Auth Multi-Tenant RBAC & Clinical Access Control Suite", () => 
         session: { id: "s-owner-1", userId: "u-owner-1", activeOrganizationId: "clinic-uuid-001" },
       };
 
-      const result = await requireClinicSession({ organization: ["delete"] }, {
+      const result = await requireClinicSession({ clinic: ["delete"] }, {
         session: mockSession,
         role: "owner",
         redirectIfUnauthorized: false,
@@ -336,12 +357,100 @@ describe("Better Auth Multi-Tenant RBAC & Clinical Access Control Suite", () => 
       assert.strictEqual(result.role, "owner");
     });
 
-    it("enforces ClinicAuthError contract with status and code properties", () => {
-      const customErr = new ClinicAuthError("Custom error message", 403, "FORBIDDEN_CUSTOM");
-      assert.strictEqual(customErr.message, "Custom error message");
-      assert.strictEqual(customErr.status, 403);
-      assert.strictEqual(customErr.code, "FORBIDDEN_CUSTOM");
-      assert.strictEqual(customErr.name, "ClinicAuthError");
+    it("enforces typed error hierarchy and handleAuthError utility", () => {
+      const unauth = new UnauthorizedError();
+      assert.strictEqual(unauth.status, 401);
+      assert.strictEqual(unauth.code, "UNAUTHENTICATED");
+      assert.ok(unauth instanceof ClinicAuthError);
+
+      const noClinic = new NoActiveClinicError();
+      assert.strictEqual(noClinic.status, 409);
+      assert.strictEqual(noClinic.code, "NO_ACTIVE_CLINIC");
+      assert.ok(noClinic instanceof ClinicAuthError);
+
+      const forbidden = new ForbiddenError();
+      assert.strictEqual(forbidden.status, 403);
+      assert.strictEqual(forbidden.code, "FORBIDDEN");
+      assert.ok(forbidden instanceof ClinicAuthError);
+
+      const response = handleAuthError(unauth);
+      assert.strictEqual(response.status, 401);
+    });
+  });
+
+  describe("requirePageSession Server Component Guard", () => {
+    it("redirects unauthenticated request to /login", async () => {
+      const emptyHeaders = new Headers();
+      await assert.rejects(
+        async () => {
+          await requirePageSession({ headers: emptyHeaders });
+        },
+        (err: unknown) => {
+          assert.ok(err !== null && typeof err === "object");
+          assert.ok("digest" in err || (err as Error).message.includes("NEXT_REDIRECT"));
+          return true;
+        }
+      );
+    });
+
+    it("redirects session without active organization to /onboarding", async () => {
+      const mockSession = {
+        user: { id: "u-1", email: "test@clinic.com", name: "Test User" },
+        session: { id: "s-1", userId: "u-1", activeOrganizationId: null },
+      };
+      await assert.rejects(
+        async () => {
+          await requirePageSession({ session: mockSession });
+        },
+        (err: unknown) => {
+          assert.ok(err !== null && typeof err === "object");
+          assert.ok("digest" in err || (err as Error).message.includes("NEXT_REDIRECT"));
+          return true;
+        }
+      );
+    });
+
+    it("returns active clinic session result when authenticated with valid role", async () => {
+      const mockSession = {
+        user: { id: "u-doc-1", email: "doc@clinic.com", name: "Dr. Doc" },
+        session: { id: "s-doc-1", userId: "u-doc-1", activeOrganizationId: "clinic-uuid-001" },
+      };
+      const result = await requirePageSession({
+        session: mockSession,
+        role: "doctor",
+      });
+      assert.strictEqual(result.clinicId, "clinic-uuid-001");
+      assert.strictEqual(result.role, "doctor");
+      assert.strictEqual(result.user.id, "u-doc-1");
+      assert.ok(result.memberId);
+    });
+  });
+
+  describe("IDOR Hardened CRM API Route Handlers", () => {
+    it("rejects unauthenticated request to /api/crm/appointments/[id] with 401 UNAUTHENTICATED", async () => {
+      const { NextRequest } = await import("next/server");
+      const appointmentIdRoute = await import("../app/api/crm/appointments/[id]/route");
+
+      const req = new NextRequest("http://localhost:3000/api/crm/appointments/123e4567-e89b-12d3-a456-426614174000");
+      const res = await appointmentIdRoute.GET(req, {
+        params: Promise.resolve({ id: "123e4567-e89b-12d3-a456-426614174000" }),
+      });
+      assert.strictEqual(res.status, 401);
+      const body = await res.json();
+      assert.strictEqual(body.code, "UNAUTHENTICATED");
+    });
+
+    it("rejects unauthenticated request to /api/crm/patients/[id] with 401 UNAUTHENTICATED", async () => {
+      const { NextRequest } = await import("next/server");
+      const patientIdRoute = await import("../app/api/crm/patients/[id]/route");
+
+      const req = new NextRequest("http://localhost:3000/api/crm/patients/123e4567-e89b-12d3-a456-426614174000");
+      const res = await patientIdRoute.GET(req, {
+        params: Promise.resolve({ id: "123e4567-e89b-12d3-a456-426614174000" }),
+      });
+      assert.strictEqual(res.status, 401);
+      const body = await res.json();
+      assert.strictEqual(body.code, "UNAUTHENTICATED");
     });
   });
 });

@@ -3,7 +3,7 @@ import { z } from "zod";
 import { eq, desc } from "drizzle-orm";
 import { db } from "@/lib/drizzle";
 import { appointments } from "@/db/schema/appointments";
-import { requireClinicSession, ClinicAuthError } from "@/lib/auth-guard";
+import { requireClinicSession, handleAuthError } from "@/lib/auth-guard";
 
 const createAppointmentSchema = z.object({
   patientId: z.string().uuid("Invalid patient UUID"),
@@ -41,16 +41,7 @@ export async function GET(request: NextRequest) {
       appointments: data,
     });
   } catch (error) {
-    if (error instanceof ClinicAuthError) {
-      return NextResponse.json(
-        { success: false, error: error.message, code: error.code },
-        { status: error.status }
-      );
-    }
-    return NextResponse.json(
-      { success: false, error: "Internal server error fetching appointments" },
-      { status: 500 }
-    );
+    return handleAuthError(error);
   }
 }
 
@@ -104,15 +95,6 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
-    if (error instanceof ClinicAuthError) {
-      return NextResponse.json(
-        { success: false, error: error.message, code: error.code },
-        { status: error.status }
-      );
-    }
-    return NextResponse.json(
-      { success: false, error: "Internal server error creating appointment" },
-      { status: 500 }
-    );
+    return handleAuthError(error);
   }
 }

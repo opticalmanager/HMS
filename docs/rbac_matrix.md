@@ -1,46 +1,53 @@
 # Apex HMS — Role-Based Access Control (RBAC) Matrix
 
-## 1. 12 Core Hospital Roles
+## 1. Better Auth Multi-Tenant Clinic Roles (Phase B Architecture)
 
-Apex HMS implements an enterprise 12-role granular permission security model:
+Better Auth manages clinic multi-tenancy (`1 Organization = 1 Clinic`) with custom role access control built using `createAccessControl` (`lib/auth-permissions.ts`). Four core clinic roles govern staff access across web panels, REST APIs, and AI copilot tools:
 
-1. **`super_admin`**: Global system architect & multisite administrator.
-2. **`hospital_admin`**: Hospital general manager / operations director.
-3. **`medical_director`**: Chief Medical Officer & clinical quality officer.
-4. **`senior_consultant`**: Specialist & super-specialist attending clinician.
-5. **`junior_resident`**: Resident doctor / duty medical officer.
-6. **`chief_nursing_officer`**: Inpatient nursing supervisor and duty roster manager.
-7. **`staff_nurse`**: Ward and ICU bedside nurse administering medication records (MAR).
-8. **`pharmacist`**: Central pharmacy dispenser and GRN receiving manager.
-9. **`chief_cashier`**: Billing supervisor and shift drawer reconciliation executive.
-10. **`receptionist`**: Front desk registration and OPD token queue coordinator.
-11. **`lab_technician`**: Pathology, biochemistry, and hematology specimen processor.
-12. **`radiologist`**: Imaging consultant reporting X-rays, USG, and CT diagnostics.
+### 1. `owner` (Clinic Director / Primary Physician)
+- **Authority**: Full, unrestricted administrative, financial, clinical, and tenant authority.
+- **Allowed Statements**: Full permissions on `organization`, `member`, `invitation`, `clinic`, `team`, `patient`, `appointment`, `schedule`, `prescription`, `billing`, `knowledge`, `aiSettings`.
+- **Special Capabilities**: Can delete organization (`organization:delete`), delete clinic profile (`clinic:delete`), approve prescriptions (`prescription:approve`), issue and void invoices, manage team members.
 
----
+### 2. `admin` (Practice Manager / Clinic Operations)
+- **Authority**: Comprehensive clinic operations, team invitations, and billing management.
+- **Allowed Statements**: `organization:update`, `clinic:read/update`, `team:*`, `patient:*`, `appointment:*`, `schedule:*`, `prescription:read/draft`, `billing:*`, `knowledge:*`, `aiSettings:*`.
+- **Strict Boundaries**: Cannot delete organization (`organization:delete`), cannot delete clinic (`clinic:delete`), and **CANNOT approve electronic prescriptions** (`prescription:approve`).
 
-## 2. 12-Role Granular Permission Security Matrix
+### 3. `doctor` (Consultant / Attending Clinician)
+- **Authority**: Outpatient consultations, clinical diagnoses, vital signs, and prescription authorization.
+- **Allowed Statements**: `clinic:read`, `patient:read/create/update`, `appointment:read/create/update/cancel`, `schedule:read/manage_own`, `prescription:read/draft/approve`, `billing:read/draft`, `knowledge:read`.
+- **Strict Boundaries**: Cannot manage team members, cannot delete clinic/organization, cannot issue final financial invoices (`billing:issue`), cannot void bills (`billing:void`), cannot modify global AI settings.
 
-| Role | View PHI | Edit EMR | Prescribe Rx | Admit/Discharge | Dispense Meds | Bill & Collect | Issue Discounts | Cancel Invoices | Financial Reports | Manage Staff | System Config | Export Audit |
-|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| **Super Admin** | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
-| **Hospital Admin** | Yes | No | No | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
-| **Medical Director** | Yes | Yes | Yes | Yes | No | No | Yes | No | Yes | Yes | No | Yes |
-| **Senior Consultant** | Yes | Yes | Yes | Yes | No | No | No | No | Yes | No | No | No |
-| **Junior Resident** | Yes | Yes | Yes | Yes | No | No | No | No | No | No | No | No |
-| **Chief Nursing Officer** | Yes | Yes | No | Yes | No | No | No | No | No | Yes | No | No |
-| **Staff Nurse** | Yes | Yes | No | No | No | No | No | No | No | No | No | No |
-| **Pharmacist** | Yes | No | No | No | Yes | Yes | No | No | No | No | No | No |
-| **Chief Cashier** | No | No | No | No | No | Yes | Yes | Yes | Yes | No | No | No |
-| **Receptionist** | No | No | No | No | No | Yes | No | No | No | No | No | No |
-| **Lab Technician** | Yes | No | No | No | No | No | No | No | No | No | No | No |
-| **Radiologist** | Yes | Yes | No | No | No | No | No | No | No | No | No | No |
+### 4. `receptionist` (Front Desk / Cashier)
+- **Authority**: Patient registration, queue token generation, appointment booking, and bill receipt collection.
+- **Allowed Statements**: `clinic:read`, `patient:read/create/update`, `appointment:read/create/update/cancel`, `schedule:read`, `billing:read/draft/issue`, `knowledge:read`.
+- **Strict Boundaries**: **CANNOT create or approve prescriptions** (`prescription:*`), cannot manage team members (`team:*`), cannot manage doctor schedules (`schedule:manage_*`), cannot void invoices (`billing:void`).
 
 ---
 
-## 3. High-Risk Clinical & Financial Safeguards
+## 2. Resource Statements & Permission Matrix
 
-- **Strict Medication Prescription Authorization**: Only accredited clinicians with council registration numbers can sign electronic prescriptions (`prescribe_medications`).
-- **Financial Discount Authorizations**: Routine receptionists are prohibited from waiving clinical fees; discounts require `chief_cashier`, `medical_director`, or `super_admin` approval.
-- **Cashier Shift Drawer Balancing**: Every cashier shift requires an explicit opening float declaration, cash drop records, and end-of-shift cash counting reconciliation with variance logging.
-- **Protected Health Information (PHI) Audit Trail**: Every access, edit, or prescription action creates an immutable record in the audit vault capturing the timestamp, user, role, module, entity, and client IP address.
+| Resource | Available Actions | `owner` | `admin` | `doctor` | `receptionist` |
+|---|---|:---:|:---:|:---:|:---:|
+| `organization` | `update`, `delete` | All | `update` | — | — |
+| `member` | `create`, `update`, `delete` | All | All | — | — |
+| `invitation` | `create`, `cancel` | All | All | — | — |
+| `clinic` | `read`, `update`, `delete` | All | `read`, `update` | `read` | `read` |
+| `team` | `read`, `invite`, `update_role`, `remove` | All | All | — | — |
+| `patient` | `read`, `create`, `update`, `delete` | All | All | `read`, `create`, `update` | `read`, `create`, `update` |
+| `appointment` | `read`, `create`, `update`, `cancel` | All | All | All | All |
+| `schedule` | `read`, `manage_own`, `manage_all` | All | All | `read`, `manage_own` | `read` |
+| `prescription` | `read`, `draft`, `approve` | All | `read`, `draft` | All | — |
+| `billing` | `read`, `draft`, `issue`, `void` | All | All | `read`, `draft` | `read`, `draft`, `issue` |
+| `knowledge` | `read`, `manage` | All | All | `read` | `read` |
+| `aiSettings` | `read`, `manage` | All | All | — | — |
+
+---
+
+## 3. High-Risk Clinical & Financial Invariants
+
+1. **Mandatory Human-in-the-Loop (HITL) for Prescriptions**: AI models, nurses, and administrators can only create `draft` prescriptions. Only credentialed doctors and clinic owners (`prescription:approve`) can authorize electronic medical prescriptions.
+2. **Sole Owner Protection**: A clinic must retain at least one active `owner`. The team management panel strictly prevents demoting or removing the last remaining owner.
+3. **No Client Trust for Tenancy**: Neither `clinicId`, `organizationId`, nor user `role` is ever accepted from client HTTP request bodies, URL params, or AI tool calls. All permissions are verified server-side via `requireClinicSession()`.
+4. **IDOR Hardening**: All individual entity queries (appointments, patients) combine `organization_id` equality with entity `id` equality to physically isolate data across tenants.

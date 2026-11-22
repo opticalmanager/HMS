@@ -51,6 +51,7 @@ export default function OnboardingPage() {
       }
 
       router.push("/dashboard");
+      router.refresh();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Error setting up clinic organization.";
       setErrorMsg(message);

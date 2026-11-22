@@ -17,6 +17,8 @@ import {
   Sparkles,
   CheckCircle2,
   Users,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -30,13 +32,18 @@ export default function LandingPage() {
   // Login form state
   const [loginEmail, setLoginEmail] = React.useState("");
   const [loginPassword, setLoginPassword] = React.useState("");
+  const [showLoginPassword, setShowLoginPassword] = React.useState(false);
   const [loginLoading, setLoginLoading] = React.useState(false);
   const [loginError, setLoginError] = React.useState<string | null>(null);
 
   // Signup form state
   const [signupName, setSignupName] = React.useState("");
   const [signupEmail, setSignupEmail] = React.useState("");
+  const [signupClinicName, setSignupClinicName] = React.useState("");
   const [signupPassword, setSignupPassword] = React.useState("");
+  const [signupConfirmPassword, setSignupConfirmPassword] = React.useState("");
+  const [showSignupPassword, setShowSignupPassword] = React.useState(false);
+  const [showSignupConfirmPassword, setShowSignupConfirmPassword] = React.useState(false);
   const [signupLoading, setSignupLoading] = React.useState(false);
   const [signupError, setSignupError] = React.useState<string | null>(null);
 
@@ -76,8 +83,19 @@ export default function LandingPage() {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSignupLoading(true);
     setSignupError(null);
+
+    if (signupPassword.length < 8) {
+      setSignupError("Password must be at least 8 characters long.");
+      return;
+    }
+
+    if (signupPassword !== signupConfirmPassword) {
+      setSignupError("Passwords do not match. Please verify your confirm password.");
+      return;
+    }
+
+    setSignupLoading(true);
 
     try {
       const res = await signUp.email({
@@ -90,6 +108,35 @@ export default function LandingPage() {
         setSignupError(res.error.message || "Registration failed.");
         setSignupLoading(false);
         return;
+      }
+
+      // Auto-create clinic organization so user is fully set up immediately
+      try {
+        const orgName =
+          signupClinicName.trim() ||
+          (signupName.trim() ? `${signupName.trim()}'s Clinic` : "Apex Healthcare Clinic");
+        const baseSlug =
+          orgName
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-|-$/g, "") || "clinic";
+        const slug = `${baseSlug}-${Math.random().toString(36).substring(2, 6)}`;
+
+        const orgRes = await authClient.organization.create({
+          name: orgName,
+          slug,
+        });
+
+        if (orgRes.data?.id) {
+          await authClient.organization.setActive({
+            organizationId: orgRes.data.id,
+          });
+          router.push("/dashboard");
+          router.refresh();
+          return;
+        }
+      } catch (orgErr) {
+        console.warn("Auto-clinic creation deferred, routing to onboarding:", orgErr);
       }
 
       router.push("/onboarding");
@@ -250,13 +297,26 @@ export default function LandingPage() {
                       <div className="relative flex items-center">
                         <Lock className="absolute left-2.5 h-3.5 w-3.5 text-slate-400" />
                         <Input
-                          type="password"
+                          type={showLoginPassword ? "text" : "password"}
                           value={loginPassword}
                           onChange={(e) => setLoginPassword(e.target.value)}
-                          className="pl-8 h-8 text-xs"
+                          className="pl-8 pr-8 h-8 text-xs"
                           placeholder="••••••••••••"
                           required
                         />
+                        <button
+                          type="button"
+                          onClick={() => setShowLoginPassword(!showLoginPassword)}
+                          className="absolute right-2.5 text-slate-400 hover:text-slate-600 focus:outline-hidden"
+                          tabIndex={-1}
+                          aria-label={showLoginPassword ? "Hide password" : "Show password"}
+                        >
+                          {showLoginPassword ? (
+                            <EyeOff className="h-3.5 w-3.5 text-slate-500" />
+                          ) : (
+                            <Eye className="h-3.5 w-3.5 text-slate-400" />
+                          )}
+                        </button>
                       </div>
                     </div>
 
@@ -277,9 +337,9 @@ export default function LandingPage() {
                       {signupError}
                     </div>
                   )}
-                  <form onSubmit={handleSignup} className="space-y-3">
+                  <form onSubmit={handleSignup} className="space-y-2.5">
                     <div>
-                      <label className="text-xs font-medium text-slate-700 block mb-1">Full Name</label>
+                      <label className="text-xs font-medium text-slate-700 block mb-0.5">Full Name</label>
                       <div className="relative flex items-center">
                         <User className="absolute left-2.5 h-3.5 w-3.5 text-slate-400" />
                         <Input
@@ -294,7 +354,7 @@ export default function LandingPage() {
                     </div>
 
                     <div>
-                      <label className="text-xs font-medium text-slate-700 block mb-1">Email</label>
+                      <label className="text-xs font-medium text-slate-700 block mb-0.5">Email</label>
                       <div className="relative flex items-center">
                         <Mail className="absolute left-2.5 h-3.5 w-3.5 text-slate-400" />
                         <Input
@@ -309,27 +369,100 @@ export default function LandingPage() {
                     </div>
 
                     <div>
-                      <label className="text-xs font-medium text-slate-700 block mb-1">Password</label>
+                      <div className="flex items-center justify-between mb-0.5">
+                        <label className="text-xs font-medium text-slate-700">Clinic Name</label>
+                        <span className="text-[10px] text-slate-400 font-normal">Optional</span>
+                      </div>
+                      <div className="relative flex items-center">
+                        <Building2 className="absolute left-2.5 h-3.5 w-3.5 text-slate-400" />
+                        <Input
+                          type="text"
+                          value={signupClinicName}
+                          onChange={(e) => setSignupClinicName(e.target.value)}
+                          className="pl-8 h-8 text-xs"
+                          placeholder={signupName.trim() ? `${signupName.trim()}'s Clinic` : "Apex Care Clinic"}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-medium text-slate-700 block mb-0.5">Password</label>
                       <div className="relative flex items-center">
                         <Lock className="absolute left-2.5 h-3.5 w-3.5 text-slate-400" />
                         <Input
-                          type="password"
+                          type={showSignupPassword ? "text" : "password"}
                           value={signupPassword}
                           onChange={(e) => setSignupPassword(e.target.value)}
-                          className="pl-8 h-8 text-xs"
-                          placeholder="Minimum 8 characters"
+                          className="pl-8 pr-8 h-8 text-xs"
+                          placeholder="Min 8 characters"
                           minLength={8}
                           required
                         />
+                        <button
+                          type="button"
+                          onClick={() => setShowSignupPassword(!showSignupPassword)}
+                          className="absolute right-2.5 text-slate-400 hover:text-slate-600 focus:outline-hidden"
+                          tabIndex={-1}
+                          aria-label={showSignupPassword ? "Hide password" : "Show password"}
+                        >
+                          {showSignupPassword ? (
+                            <EyeOff className="h-3.5 w-3.5 text-slate-500" />
+                          ) : (
+                            <Eye className="h-3.5 w-3.5 text-slate-400" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-0.5">
+                        <label className="text-xs font-medium text-slate-700">Confirm Password</label>
+                        {signupConfirmPassword.length > 0 && signupPassword === signupConfirmPassword && (
+                          <span className="text-[10px] text-emerald-600 font-medium flex items-center gap-0.5">
+                            <CheckCircle2 className="h-3 w-3" /> Match
+                          </span>
+                        )}
+                        {signupConfirmPassword.length > 0 && signupPassword !== signupConfirmPassword && (
+                          <span className="text-[10px] text-rose-500 font-medium">Mismatch</span>
+                        )}
+                      </div>
+                      <div className="relative flex items-center">
+                        <Lock className="absolute left-2.5 h-3.5 w-3.5 text-slate-400" />
+                        <Input
+                          type={showSignupConfirmPassword ? "text" : "password"}
+                          value={signupConfirmPassword}
+                          onChange={(e) => setSignupConfirmPassword(e.target.value)}
+                          className={`pl-8 pr-8 h-8 text-xs ${
+                            signupConfirmPassword.length > 0 && signupPassword !== signupConfirmPassword
+                              ? "border-rose-300"
+                              : ""
+                          }`}
+                          placeholder="Re-enter password"
+                          minLength={8}
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowSignupConfirmPassword(!showSignupConfirmPassword)}
+                          className="absolute right-2.5 text-slate-400 hover:text-slate-600 focus:outline-hidden"
+                          tabIndex={-1}
+                          aria-label={showSignupConfirmPassword ? "Hide password" : "Show password"}
+                        >
+                          {showSignupConfirmPassword ? (
+                            <EyeOff className="h-3.5 w-3.5 text-slate-500" />
+                          ) : (
+                            <Eye className="h-3.5 w-3.5 text-slate-400" />
+                          )}
+                        </button>
                       </div>
                     </div>
 
                     <Button
                       type="submit"
-                      className="w-full h-8 bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs mt-1"
+                      className="w-full h-8 bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs mt-1 shadow-xs"
                       disabled={signupLoading}
                     >
-                      {signupLoading ? "Creating Account..." : "Create Account & Setup Clinic"}
+                      {signupLoading ? "Creating Account & Clinic..." : "Create Account & Setup Clinic"}
                     </Button>
                   </form>
                 </TabsContent>

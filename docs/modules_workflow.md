@@ -1,5 +1,21 @@
 # Apex HMS — Clinical Modules Workflow Guide
 
+## 0. Authentication, Clinic Registration & Multi-Tenant Onboarding
+
+### User Registration & Instant Organization Provisioning
+1. **Clinical Signup (`/signup`)**:
+   - Clinical staff or hospital owner registers with **Full Legal Name**, **Official Email**, an optional **Clinic / Hospital Name**, **Password** (min 8 chars), and **Confirm Password**.
+   - Features password visibility toggles (`Eye` / `EyeOff`) and real-time password matching validation.
+   - Upon successful account registration, the system automatically provisions the user's clinic organization (e.g., `"[Name]'s Clinic"` or user-specified name) with a unique tenant slug, assigns the registering user the `owner` role, sets the organization as active (`organization.setActive`), and transitions directly to `/dashboard`.
+   - If organization provisioning is deferred, the user is safely routed to `/onboarding`.
+2. **Clinical Staff Login (`/login`)**:
+   - Secure authentication via Better Auth email and password.
+   - Evaluates active organization memberships. If organizations exist, the primary clinic is activated and the user is redirected to `/dashboard` (or requested callback URL); if no organization exists, routes to `/onboarding`.
+3. **Multi-Origin & Reverse Proxy Resilience**:
+   - `lib/auth.ts` dynamically validates incoming request origins against trusted local patterns (`localhost:*`, `127.0.0.1:*`, private LAN subnets) and production domains, eliminating `Invalid origin` rejections across reverse proxies, Docker standalone environments, and local dev ports.
+
+---
+
 ## 1. End-to-End Patient Journey
 
 The hospital monolith coordinates patient care through a seamless multi-department pipeline:
