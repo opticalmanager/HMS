@@ -66,6 +66,18 @@ static listSlotBlocks(
   options?: { doctorId?: string; fromDate?: Date; toDate?: Date }
 ): Promise<DoctorSlotBlockEntity[]>;
 
+static blockDoctorSlot(input: {
+  organizationId: string;
+  doctorId: string;
+  startAt: Date;
+  endAt: Date;
+  reason?: string;
+  createdVia?: string;
+  createdByUserId?: string;
+  dryRun?: boolean;
+  notifyAffectedPatients?: boolean;
+}): Promise<BlockDoctorSlotResult>;
+
 static createSlotBlock(
   organizationId: string,
   input: z.infer<typeof createDoctorSlotBlockSchema>,
@@ -95,6 +107,13 @@ static getAppointmentById(
   appointmentId: string
 ): Promise<AppointmentEntity | null>;
 
+static getAvailableSlots(options: {
+  organizationId: string;
+  doctorId: string;
+  date: string;
+  maxSlots?: number;
+}): Promise<AvailableSlotItem[]>;
+
 static createAppointment(
   clinicId: string,
   input: CreateAppointmentInput
@@ -110,6 +129,110 @@ static cancelAppointment(
   clinicId: string,
   appointmentId: string
 ): Promise<AppointmentEntity | null>;
+```
+
+### 5. `PrescriptionDomainService` (`services/domain/prescription-service.ts`)
+```ts
+static createDraftPrescription(input: {
+  organizationId: string;
+  doctorId: string;
+  patientId: string;
+  appointmentId?: string;
+  rawTranscript?: string;
+  extraction: VisitExtraction;
+}): Promise<PrescriptionEntity>;
+
+static listPrescriptions(
+  organizationId: string,
+  options?: { patientId?: string; doctorId?: string; appointmentId?: string; status?: "DRAFT" | "APPROVED" | "CANCELLED"; limit?: number }
+): Promise<PrescriptionEntity[]>;
+
+static getPrescriptionById(
+  organizationId: string,
+  prescriptionId: string
+): Promise<PrescriptionEntity | null>;
+
+static updateDraftPrescription(input: {
+  organizationId: string;
+  prescriptionId: string;
+  chiefComplaint?: string | null;
+  symptoms?: string[];
+  diagnosis?: string | null;
+  medicines?: Array<...>;
+  instructions?: string | null;
+}): Promise<PrescriptionEntity>;
+
+static approvePrescription(input: {
+  organizationId: string;
+  prescriptionId: string;
+  approvedByUserId: string;
+}): Promise<PrescriptionEntity>;
+```
+
+### 6. `BillingDomainService` (`services/domain/billing-service.ts`)
+```ts
+static createDraftInvoiceFromItems(input: {
+  organizationId: string;
+  patientId: string;
+  appointmentId?: string;
+  items: Array<{ spokenServiceName: string; quantity?: number; customAmountIfStated?: number }>;
+  billerUserId?: string;
+}): Promise<InvoiceEntity>;
+
+static listInvoices(
+  organizationId: string,
+  options?: { patientId?: string; status?: "DRAFT" | "ISSUED" | "PAID" | "VOID"; limit?: number }
+): Promise<InvoiceEntity[]>;
+
+static getInvoiceById(
+  organizationId: string,
+  invoiceId: string
+): Promise<InvoiceEntity | null>;
+
+static updateDraftInvoice(input: {
+  organizationId: string;
+  invoiceId: string;
+  items: Array<{ spokenServiceName: string; quantity?: number; customAmountIfStated?: number }>;
+}): Promise<InvoiceEntity>;
+
+static issueInvoice(input: {
+  organizationId: string;
+  invoiceId: string;
+}): Promise<InvoiceEntity>;
+
+static voidInvoice(input: {
+  organizationId: string;
+  invoiceId: string;
+}): Promise<InvoiceEntity>;
+```
+
+### 7. `NotificationDomainService` (`services/domain/notification-service.ts`)
+```ts
+static enqueueWebhookEvent(
+  tx: any,
+  input: {
+    organizationId: string;
+    eventType: string;
+    payload: Record<string, any>;
+  }
+): Promise<WebhookOutboxEntity>;
+
+static dispatchPendingOutboxEvents(options?: {
+  batchSize?: number;
+}): Promise<{ processedCount: number; successCount: number; failureCount: number; skippedCount: number }>;
+
+static generateOutboxSignature(payloadString: string, secret: string): string;
+```
+
+### 8. `AI Core (LlmClient)` (`modules/ai/llm-client.ts`)
+```ts
+export class LlmClient {
+  constructor(options?: { provider?: LLMProvider });
+  generateStructured<T>(req: StructuredPromptRequest, schema: z.ZodSchema<T>): Promise<T>;
+  generateStructuredFromAudio<T>(req: AudioPromptRequest, schema: z.ZodSchema<T>): Promise<T>;
+  generateText(req: TextPromptRequest): Promise<string>;
+  streamText(req: TextPromptRequest): AsyncGenerator<string>;
+}
 ```
 
 ### 5. `CatalogService` (`services/domain/catalog-service.ts`)
@@ -281,3 +404,43 @@ export function decryptBroadcastApiKey(cipherString: string): string;
 - **RBAC Requirement**: `{ appointment: ["update"] }`
 - **Payload**: `{ appointmentDate?, timeSlot?, slotStart?, slotEnd?, status?, priority?, chiefComplaints?, consultationFee?, isPaid? }`
 - **Response**: `{ success: true, appointment: {...} }` or HTTP 409 on slot collision.
+
+### 17. `POST /api/crm/prescriptions`
+- **Purpose**: Create a human-in-the-loop DRAFT prescription with fuzzy drug grounding from doctor dictation extraction.
+- **RBAC Requirement**: `{ prescription: ["draft"] }`. Allows doctor, admin, owner.
+- **Payload**: `{ doctorId, patientId, appointmentId?, rawTranscript?, extraction: VisitExtraction }`
+- **Response**: HTTP 201 `{ success: true, prescription: {...} }` with status `"DRAFT"`.
+
+### 18. `GET /api/crm/prescriptions`
+- **Purpose**: List prescriptions scoped to active clinic organization.
+- **RBAC Requirement**: `{ prescription: ["draft"] }`
+- **Query Params**: `patientId?`, `doctorId?`, `appointmentId?`, `status?`, `limit?`
+- **Response**: `{ success: true, count, prescriptions: [...] }`
+
+### 19. `POST /api/crm/prescriptions/:id/approve`
+- **Purpose**: Atomically approve a DRAFT prescription, record clinician sign-off, lock against subsequent edits, and enqueue `prescription.approved` outbox event.
+- **RBAC Requirement**: `{ prescription: ["approve"] }`. Doctors, Admins, and Owners only; Receptionists get 403 Forbidden.
+- **Response**: `{ success: true, prescription: {...} }` or HTTP 409 if already approved.
+
+### 20. `POST /api/crm/invoices`
+- **Purpose**: Create a DRAFT invoice with deterministic pricing grounded against official clinic `service_tariffs`.
+- **RBAC Requirement**: `{ billing: ["draft"] }`
+- **Payload**: `{ patientId, appointmentId?, items: [{ spokenServiceName, quantity?, customAmountIfStated? }] }`
+- **Response**: HTTP 201 `{ success: true, invoice: {...} }` with status `"DRAFT"`.
+
+### 21. `GET /api/crm/invoices`
+- **Purpose**: List invoices scoped to active clinic organization.
+- **RBAC Requirement**: `{ billing: ["read"] }`
+- **Query Params**: `patientId?`, `status?`, `limit?`
+- **Response**: `{ success: true, count, invoices: [...] }`
+
+### 22. `POST /api/crm/invoices/:id/issue`
+- **Purpose**: Finalize a DRAFT invoice to `"ISSUED"`, generate sequential invoice number, and enqueue `invoice.issued` outbox event.
+- **RBAC Requirement**: `{ billing: ["issue"] }`
+- **Response**: `{ success: true, invoice: {...} }` or HTTP 409 if not in DRAFT status.
+
+### 23. `POST /api/internal/outbox/dispatch`
+- **Purpose**: Trigger transactional outbox processor to claim and dispatch pending outbound events (appointment confirmed/cancelled, prescription approved, invoice issued) to clinic's configured WhatsApp/webhook endpoint with HMAC-SHA256 signature.
+- **Authorization**: Protected by Bearer token matching `INTERNAL_CRON_SECRET` or an authenticated `owner`/`admin` session.
+- **Query Params**: `limit?` (default 20, max 100)
+- **Response**: `{ success: true, processedCount, successCount, failureCount, skippedCount }`

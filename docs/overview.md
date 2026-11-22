@@ -46,7 +46,24 @@ The architecture strictly enforces multi-tenancy (`1 Organization = 1 Clinic`) v
 
 ---
 
-## 4. The 12 Monolithic Modules
+## 4. Shared Domain Services, Outbox & Gemini AI Core (Step 3 Completed)
+
+1. **Comprehensive Shared Domain Services (`services/domain/*`)**:
+   - `appointment-service.ts`: Timezone-aware open slot calculation (`Asia/Kolkata`), concurrency conflict fallback offering nearest open alternative slots (`suggestedSlots`), and transactional outbox write integration.
+   - `schedule-service.ts`: 2-step doctor slot blocking workflow (`dryRun: true/false`) returning conflicting active appointments for clinician review before persisting block and triggering patient reschedule notices.
+   - `prescription-service.ts`: Human-in-the-loop electronic prescriptions with deterministic medicine grounding via `pg_trgm` fuzzy search, automatic review flagging (`needsReview: true`), and immutable approval locks.
+   - `billing-service.ts`: Official service tariff enforcement (AI cannot hallucinate prices), deterministic GST calculation, and invoice state transitions (`DRAFT` → `ISSUED`).
+   - `notification-service.ts`: Transactional outbox engine with 2-phase worker claim (`FOR UPDATE SKIP LOCKED`), HMAC-SHA256 request signing, and exponential backoff retry scheduling.
+2. **Gemini-First, Provider-Agnostic AI Core (`modules/ai/`)**:
+   - Google GenAI SDK integration (`@google/genai`) with dual-tier task routing: `TIER_FAST` (`gemini-2.5-flash-lite`) and `TIER_REASONING` (`gemini-2.5-flash`) with automatic rate-limit fallback.
+   - Multimodal native audio dictation support (up to 10MB payload size guard).
+   - Inbound security guardrails preventing prompt injection and exfiltration attacks, accompanied by PII log redaction (`redactPiiForLogs`).
+   - Outbound clinical safety guardrail detecting emergency red flags (chest pain, acute dyspnea) on patient-facing channels (`WHATSAPP`, `VOICE_DOGRAH`).
+   - Non-blocking governance telemetry recording tokens and estimated cost in `ai_audit_logs`.
+
+---
+
+## 5. The 12 Monolithic Modules
 
 | # | Module | Operational Focus | Key Features |
 |---|---|---|---|

@@ -1,5 +1,5 @@
 import "server-only";
-import { eq, and, asc, desc, gte, lte } from "drizzle-orm";
+import { eq, and, asc, desc, gte, lte, inArray, lt, gt } from "drizzle-orm";
 import { db } from "@/lib/drizzle";
 import {
   doctorSchedules,
@@ -7,12 +7,42 @@ import {
   type DoctorScheduleEntity,
   type DoctorSlotBlockEntity,
 } from "@/db/schema/schedules";
+import { appointments } from "@/db/schema/appointments";
+import { patients } from "@/db/schema/patients";
+import { enqueueWebhookEvent } from "./notification-service";
 import type { z } from "zod";
 import type {
   createDoctorScheduleSchema,
   updateDoctorScheduleSchema,
   createDoctorSlotBlockSchema,
 } from "@/lib/validations/master-data";
+
+export interface ConflictingAppointment {
+  appointmentId: string;
+  patientName: string;
+  slotStart: Date | null;
+  appointmentDate?: string;
+  timeSlot?: string;
+}
+
+export interface BlockDoctorSlotInput {
+  doctorId: string;
+  startAt: Date | string;
+  endAt: Date | string;
+  reason?: string | null;
+  createdVia?: "WEB" | "WHATSAPP";
+  createdByUserId?: string | null;
+  notifyAffectedPatients?: boolean;
+  dryRun?: boolean;
+}
+
+export interface BlockDoctorSlotResult {
+  dryRun: boolean;
+  requiresConfirmation: boolean;
+  conflictCount: number;
+  conflicts: ConflictingAppointment[];
+  block?: DoctorSlotBlockEntity;
+}
 
 export class ScheduleService {
   /**
@@ -158,27 +188,120 @@ export class ScheduleService {
   }
 
   /**
-   * Blocks doctor calendar slots for breaks, meetings, or leave.
+   * Mandatory 2-Step Conflict Check for Doctor Slot Blocking:
+   * Queries overlapping active appointments in [startAt, endAt].
+   * dryRun === true: returns conflict summary without DB write.
+   * dryRun === false: inserts doctor_slot_blocks and enqueues appointment.reschedule_needed
+   * events in webhook_outbox inside same transaction if notifyAffectedPatients is true.
+   */
+  static async blockDoctorSlot(
+    organizationId: string,
+    input: BlockDoctorSlotInput
+  ): Promise<BlockDoctorSlotResult> {
+    const parsedStart = input.startAt instanceof Date ? input.startAt : new Date(input.startAt);
+    const parsedEnd = input.endAt instanceof Date ? input.endAt : new Date(input.endAt);
+    const dryRun = input.dryRun ?? false;
+
+    // 1. Query overlapping active appointments
+    const overlapping = await db
+      .select({
+        appointmentId: appointments.id,
+        patientId: appointments.patientId,
+        patientName: patients.fullName,
+        slotStart: appointments.slotStart,
+        appointmentDate: appointments.appointmentDate,
+        timeSlot: appointments.timeSlot,
+      })
+      .from(appointments)
+      .leftJoin(patients, eq(appointments.patientId, patients.id))
+      .where(
+        and(
+          eq(appointments.organizationId, organizationId),
+          eq(appointments.doctorId, input.doctorId),
+          inArray(appointments.status, ["scheduled", "arrived", "in_consultation"]),
+          lt(appointments.slotStart, parsedEnd),
+          gt(appointments.slotEnd, parsedStart)
+        )
+      );
+
+    const conflicts: ConflictingAppointment[] = overlapping.map((row) => ({
+      appointmentId: row.appointmentId,
+      patientName: row.patientName || "Unknown Patient",
+      slotStart: row.slotStart,
+      appointmentDate: row.appointmentDate,
+      timeSlot: row.timeSlot,
+    }));
+
+    // If dry run, return conflict report immediately without touching the DB
+    if (dryRun) {
+      return {
+        dryRun: true,
+        requiresConfirmation: conflicts.length > 0,
+        conflictCount: conflicts.length,
+        conflicts,
+      };
+    }
+
+    // dryRun === false: execute insert and notification inside transaction
+    return await db.transaction(async (tx) => {
+      const [block] = await tx
+        .insert(doctorSlotBlocks)
+        .values({
+          organizationId,
+          doctorId: input.doctorId,
+          startAt: parsedStart,
+          endAt: parsedEnd,
+          reason: input.reason?.trim() || null,
+          createdVia: input.createdVia || "WEB",
+          createdByUserId: input.createdByUserId || null,
+        })
+        .returning();
+
+      if (input.notifyAffectedPatients && conflicts.length > 0) {
+        for (const c of conflicts) {
+          await enqueueWebhookEvent(tx, {
+            organizationId,
+            eventType: "appointment.reschedule_needed",
+            payload: {
+              appointmentId: c.appointmentId,
+              doctorId: input.doctorId,
+              patientName: c.patientName,
+              slotStart: c.slotStart ? c.slotStart.toISOString() : null,
+              reason: input.reason || "Doctor unavailable",
+            },
+          });
+        }
+      }
+
+      return {
+        dryRun: false,
+        requiresConfirmation: false,
+        conflictCount: conflicts.length,
+        conflicts,
+        block,
+      };
+    });
+  }
+
+  /**
+   * Blocks doctor calendar slots for breaks, meetings, or leave (convenience wrapper).
    */
   static async createSlotBlock(
     organizationId: string,
     input: z.infer<typeof createDoctorSlotBlockSchema>,
     createdByUserId?: string
   ): Promise<DoctorSlotBlockEntity> {
-    const [created] = await db
-      .insert(doctorSlotBlocks)
-      .values({
-        organizationId,
-        doctorId: input.doctorId,
-        startAt: new Date(input.startAt),
-        endAt: new Date(input.endAt),
-        reason: input.reason?.trim() || null,
-        createdVia: input.createdVia || "WEB",
-        createdByUserId: createdByUserId || null,
-      })
-      .returning();
+    const result = await this.blockDoctorSlot(organizationId, {
+      doctorId: input.doctorId,
+      startAt: input.startAt,
+      endAt: input.endAt,
+      reason: input.reason,
+      createdVia: input.createdVia,
+      createdByUserId,
+      dryRun: false,
+    });
 
-    return created;
+    return result.block!;
   }
 
   /**

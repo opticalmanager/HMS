@@ -137,3 +137,48 @@ Hospital administrators, accountants, and clinical heads access 16 operational r
 - **Top KPI Statistical Summary Cards**: Formatted in Indian Lakh/Crore (`₹`), mint green badge card (`#e8f5e9`) for Total Paid, soft coral card (`#ffebee`) for Total Due, and math formula cards for Collections.
 - **Enterprise High-Density Data Table**: Sticky headers and sticky left columns (`No.`, `UHID`, `Patient Name`, `Bill #`), status badges, and bottom Grand Total sums row.
 - **Reports Export Engine**: One-click Excel/CSV export (`exportToCsv` with UTF-8 BOM) and official A4 Print Preview with hospital headers.
+
+---
+
+## 3. AI-Assisted Clinical Dictation & Transactional Outbox Workflows
+
+### 1. Doctor Voice Dictation & Human-in-the-Loop (HITL) Prescription Flow
+1. **Multimodal Audio / Transcript Ingestion**:
+   - Doctor records consultation notes or dictates visit summary in natural English or conversational Hinglish.
+   - Multimodal native audio or transcribed text is processed by `LlmClient` using the reasoning tier (`gemini-2.5-flash`).
+2. **Deterministic Formulary & Pricing Grounding**:
+   - Structured JSON output conforms strictly to `VisitExtractionSchema` (`lib/validations/clinical-ai.ts`).
+   - Every parsed medication name is deterministically grounded against clinic's `medicine_master` formulary using `pg_trgm` fuzzy matching.
+   - Low-confidence matches (score < 0.45), low LLM extraction confidence (< 0.75), or missing dosage/duration are automatically flagged with `needsReview: true`.
+3. **Mandatory Human-in-the-Loop (DRAFT Status)**:
+   - Prescriptions are strictly created with `status: "DRAFT"`. AI is strictly forbidden from directly approving or issuing prescriptions.
+   - Attending doctor or authorized clinician reviews the draft in the OPD workspace, corrects any flagged low-confidence medications, and clicks **Approve Prescription**.
+4. **Approval & Immutability**:
+   - Calling `/api/crm/prescriptions/[id]/approve` records `approvedByUserId` + timestamp and transitions status to `APPROVED`.
+   - Any subsequent attempt to edit an `APPROVED` prescription is blocked with HTTP 409 `ALREADY_APPROVED`.
+
+### 2. Tariff-Grounded Draft Billing
+1. **Tariff Price Enforcement**:
+   - Billable services extracted from dictation are grounded against clinic `service_tariffs` master using `fuzzyMatchTariffs`.
+   - Unit prices and tax rates are always fetched from official PostgreSQL records—never accepted from LLM-generated amounts unless explicitly flagged as `DOCTOR_OVERRIDE` with `needsReview: true`.
+2. **Draft → Issued Lifecycle**:
+   - Draft invoices are saved with `status: "DRAFT"`.
+   - Staff finalizes charges and calls `/api/crm/invoices/[id]/issue` to generate official invoice sequence and lock record.
+
+### 3. Transactional Outbox & WhatsApp Dispatch Architecture
+1. **Zero Booking Coupling**:
+   - All booking confirmations, cancellations, reschedules, prescription approvals, and invoice issuances enqueue an event into `webhook_outbox` inside the **same database transaction**.
+   - Outage or latency in third-party WhatsApp providers (e.g. Broadcast Manager) never rolls back or fails appointment booking commits.
+2. **Cron Dispatcher (`POST /api/internal/outbox/dispatch`)**:
+   - Claim worker uses `FOR UPDATE SKIP LOCKED` to concurrently fetch pending and due retry events without race conditions.
+   - Signs each outbound webhook with HMAC-SHA256 (`X-CRM-Signature`, `X-CRM-Event`, `X-CRM-Delivery-Id`) using the clinic's decrypted secret key (`lib/crypto.ts`).
+   - Dispatches via HTTP POST with a 10-second timeout. On failure, schedules exponential backoff retries (`2^attempts` minutes) up to 3 attempts.
+
+### 4. 2-Step Doctor Slot Blocking (Dry-Run Conflict Detection)
+1. **Step 1: Conflict Preview (`dryRun: true`)**:
+   - When a doctor or admin schedules a block/leave, `blockDoctorSlot` checks for active overlapping appointments (`scheduled`, `arrived`, `in_consultation`).
+   - Returns `{ requiresConfirmation: true, conflictCount, conflicts: [...] }` without altering the database.
+2. **Step 2: Execution (`dryRun: false`)**:
+   - Doctor confirms block after reviewing conflicts.
+   - Block is persisted in `doctor_slot_blocks`.
+   - If `notifyAffectedPatients: true`, `appointment.reschedule_needed` events are enqueued in `webhook_outbox` for each impacted patient.
