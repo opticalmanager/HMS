@@ -1,4 +1,5 @@
-import { pgTable, text, timestamp, uuid, integer, jsonb, index } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, uuid, integer, jsonb, index, uniqueIndex } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { organizations } from "./organizations";
 import { branches } from "./branches";
 
@@ -16,6 +17,7 @@ export const patients = pgTable(
     dateOfBirth: text("date_of_birth"), // YYYY-MM-DD
     age: integer("age"),
     phone: text("phone").notNull(),
+    phoneE164: text("phone_e164"),
     email: text("email"),
     address: text("address"),
     city: text("city"),
@@ -36,7 +38,12 @@ export const patients = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
-  (table) => [index("patients_organization_id_idx").on(table.organizationId)]
+  (table) => [
+    index("patients_organization_id_idx").on(table.organizationId),
+    uniqueIndex("patients_org_phone_e164_unique_idx")
+      .on(table.organizationId, table.phoneE164)
+      .where(sql`phone_e164 IS NOT NULL`),
+  ]
 );
 
 export type PatientEntity = typeof patients.$inferSelect;

@@ -2,162 +2,230 @@
 
 ## 1. Internal Clinical Service Layer
 
-Apex HMS encapsulates business logic into monolithic domain services residing in `services/`:
+Apex HMS encapsulates business logic into monolithic domain services residing in `services/domain/*` and `services/*`:
 
-### 1. `AuthService` & `lib/auth-guard.ts`
+### 1. `ClinicService` (`services/domain/clinic-service.ts`)
 ```ts
-// Server-side tenant session guard (Never trusts client-supplied organizationId)
-export async function requireClinicSession(
-  permissionOrOptions?: PermissionCheck | RequireClinicSessionOptions,
-  maybeOptions?: RequireClinicSessionOptions
-): Promise<ClinicSessionResult>;
+static getClinicProfile(organizationId: string): Promise<SanitizedClinicProfile>;
 
-// Server component page session guard
-export async function requirePageSession(
-  options?: RequireClinicSessionOptions | PermissionCheck
-): Promise<ClinicSessionResult>;
-
-// Standardized auth error response handler
-export function handleAuthError(err: unknown): NextResponse;
+static updateClinicProfile(
+  organizationId: string,
+  input: z.infer<typeof updateClinicProfileSchema>
+): Promise<SanitizedClinicProfile>;
 ```
 
-### 2. `AppointmentService`
+### 2. `DoctorService` (`services/domain/doctor-service.ts`)
 ```ts
-static generateNextToken(currentDailyCount: number): number;
+static listDoctors(
+  organizationId: string,
+  options?: { isActiveOnly?: boolean }
+): Promise<DoctorEntity[]>;
 
-static createAppointmentRecord(
-  input: BookAppointmentInput,
-  currentTokenCount: number
-): Appointment;
+static getDoctorById(
+  organizationId: string,
+  doctorId: string
+): Promise<DoctorEntity | null>;
 
-static formatTokenLabel(tokenNumber: number): string;
+static getDoctorByUserId(
+  organizationId: string,
+  userId: string
+): Promise<DoctorEntity | null>;
+
+static createDoctor(
+  organizationId: string,
+  input: z.infer<typeof createDoctorSchema>
+): Promise<DoctorEntity>;
+
+static updateDoctor(
+  organizationId: string,
+  doctorId: string,
+  input: z.infer<typeof updateDoctorSchema>
+): Promise<DoctorEntity | null>;
 ```
 
-### 3. `ClinicalService`
+### 3. `ScheduleService` (`services/domain/schedule-service.ts`)
 ```ts
-static processVitals(vitals: VitalRecord): VitalRecord & {
-  bpStatus: string;
-  pulseStatus: string;
-  spo2Status: string;
-  tempStatus: string;
-  bmiInfo: { bmi: number; category: string };
-};
+static listSchedules(
+  organizationId: string,
+  doctorId?: string
+): Promise<DoctorScheduleEntity[]>;
 
-static buildConsultation(
-  input: CreateConsultationInput,
-  sequenceCounter: number
-): OpdConsultation;
+static createSchedule(
+  organizationId: string,
+  input: z.infer<typeof createDoctorScheduleSchema>
+): Promise<DoctorScheduleEntity>;
+
+static updateSchedule(
+  organizationId: string,
+  scheduleId: string,
+  input: z.infer<typeof updateDoctorScheduleSchema>
+): Promise<DoctorScheduleEntity | null>;
+
+static listSlotBlocks(
+  organizationId: string,
+  options?: { doctorId?: string; fromDate?: Date; toDate?: Date }
+): Promise<DoctorSlotBlockEntity[]>;
+
+static createSlotBlock(
+  organizationId: string,
+  input: z.infer<typeof createDoctorSlotBlockSchema>,
+  createdByUserId?: string
+): Promise<DoctorSlotBlockEntity>;
+
+static deleteSlotBlock(
+  organizationId: string,
+  blockId: string
+): Promise<boolean>;
 ```
 
-### 4. `IpdService`
+### 4. `CatalogService` (`services/domain/catalog-service.ts`)
 ```ts
-static admitPatient(
-  input: IpdAdmissionInput,
-  sequenceCounter: number
-): IpdAdmission;
+static listMedicines(
+  organizationId: string,
+  query?: string,
+  limit?: number
+): Promise<Array<MedicineMasterEntity | FuzzyMedicineResult>>;
 
-static calculateOccupancy(bedsList: Bed[]): {
-  total: number;
-  occupied: number;
-  available: number;
-  occupancyRatePercent: number;
-};
+static createMedicine(
+  organizationId: string,
+  input: z.infer<typeof createMedicineSchema>
+): Promise<MedicineMasterEntity>;
+
+static updateMedicine(
+  organizationId: string,
+  medicineId: string,
+  input: z.infer<typeof updateMedicineSchema>
+): Promise<MedicineMasterEntity | null>;
+
+static listTariffs(
+  organizationId: string,
+  query?: string,
+  limit?: number
+): Promise<Array<ServiceTariffEntity | FuzzyTariffResult>>;
+
+static createTariff(
+  organizationId: string,
+  input: z.infer<typeof createTariffSchema>
+): Promise<ServiceTariffEntity>;
+
+static updateTariff(
+  organizationId: string,
+  tariffId: string,
+  input: z.infer<typeof updateTariffSchema>
+): Promise<ServiceTariffEntity | null>;
 ```
 
-### 5. `BillingService`
+### 5. `FuzzySearch` (`lib/fuzzy-search.ts`)
 ```ts
-static calculateLineItem(item: RawBillingLineItem): InvoiceItem;
+export async function fuzzyMatchMedicines(
+  organizationId: string,
+  query: string,
+  limit?: number
+): Promise<FuzzyMedicineResult[]>;
 
-static generateInvoice(
-  patientId: string,
-  items: InvoiceItem[],
-  invoiceType: "opd" | "ipd" | "pharmacy" | "lab",
-  sequenceCounter: number,
-  discountTotal?: number
-): Invoice;
-
-static formatThermalReceipt(invoice: Invoice, branchConfig: BranchReceiptConfig): string;
+export async function fuzzyMatchTariffs(
+  organizationId: string,
+  query: string,
+  limit?: number
+): Promise<FuzzyTariffResult[]>;
 ```
 
-### 6. `AbdmService`
+### 6. `Phone` & `Crypto` Utilities
 ```ts
-static requestAbhaOtp(
-  identifier: string,
-  authMode?: "AADHAAR_OTP" | "MOBILE_OTP"
-): Promise<AbhaGenerateOtpResponse>;
+// lib/phone.ts
+export function normalizePhoneE164(
+  input: string | null | undefined,
+  defaultCountryCode?: string
+): string | null;
 
-static verifyAbhaOtp(
-  txnId: string,
-  otp: string
-): Promise<AbhaProfile>;
-
-static linkClinicalEncounter(
-  uhid: string,
-  abhaAddress: string,
-  contexts: CareContextLinkItem[]
-): Promise<CareContextLinkResponse>;
+// lib/crypto.ts (server-only)
+export function encryptBroadcastApiKey(plaintext: string): string;
+export function decryptBroadcastApiKey(cipherString: string): string;
 ```
 
 ---
 
 ## 2. HTTP Route Handlers & CRM REST API
 
-### 1. `GET /api/auth/[...all]` & `POST /api/auth/[...all]`
-- **Purpose**: Better Auth server engine handling multi-tenant session lifecycle, organization onboarding, staff invitations, and API keys.
+### 1. `GET /api/crm/settings/clinic`
+- **Purpose**: Retrieve clinic timezone, slot duration, working hours, and WABA status.
+- **RBAC Requirement**: `{ clinic: ["read"] }`
+- **Response**: `{ success: true, clinicId, role, profile: {...} }`
 
-### 2. `GET /api/crm/appointments`
-- **Purpose**: Retrieve appointments scoped strictly to active clinic organization.
-- **RBAC Requirement**: `{ appointment: ["read"] }`
-- **Response**: `{ success: true, clinicId, role, count, appointments: [...] }`
+### 2. `PUT /api/crm/settings/clinic`
+- **Purpose**: Update clinic operational configuration. Encrypts WABA API key with AES-256-GCM.
+- **RBAC Requirement**: `{ clinic: ["update"] }`
+- **Payload**: `{ timezone, defaultSlotMinutes, invoicePrefix, gstin?, wabaId?, broadcastWebhookUrl?, broadcastApiKey?, workingHoursJson? }`
+- **Response**: `{ success: true, profile: {...} }`
 
-### 3. `POST /api/crm/appointments`
-- **Purpose**: Book appointment scoped strictly to active clinic organization.
-- **RBAC Requirement**: `{ appointment: ["create"] }`
-- **Payload**: `{ patientId, doctorId, branchId, department, appointmentDate, timeSlot, priority?, chiefComplaints?, consultationFee? }`
-- **Response**: `{ success: true, appointment: {...} }` with HTTP 201.
+### 3. `GET /api/crm/schedules`
+- **Purpose**: List recurring weekly consultation schedules by clinic or doctor.
+- **RBAC Requirement**: `{ schedule: ["read"] }`
+- **Query Params**: `doctorId?`
+- **Response**: `{ success: true, count, schedules: [...] }`
 
-### 4. `GET /api/crm/appointments/[id]`
-- **Purpose**: IDOR-hardened appointment fetch with compound filter `eq(organizationId, clinicId) AND eq(id, id)`.
-- **RBAC Requirement**: `{ appointment: ["read"] }`
-- **Response**: `{ success: true, clinicId, role, appointment: {...} }` or HTTP 404 if not in current tenant.
+### 4. `POST /api/crm/schedules`
+- **Purpose**: Create a recurring weekly schedule block.
+- **RBAC Requirement**: `{ schedule: ["manage_own"] }`. Doctors may only create schedules for their own clinician record; Receptionists get 403 Forbidden.
+- **Payload**: `{ doctorId, dayOfWeek, startTime, endTime, slotDurationMins, isActive? }`
+- **Response**: `{ success: true, schedule: {...} }` with HTTP 201.
 
-### 5. `PATCH /api/crm/appointments/[id]`
-- **Purpose**: IDOR-hardened appointment status or slot update with compound filter `eq(organizationId, clinicId) AND eq(id, id)`.
-- **RBAC Requirement**: `{ appointment: ["update"] }`
-- **Payload**: `{ status?, timeSlot?, appointmentDate?, priority?, isPaid? }`
-- **Response**: `{ success: true, appointment: {...} }` or HTTP 404.
+### 5. `PUT /api/crm/schedules`
+- **Purpose**: Update a recurring weekly schedule block.
+- **RBAC Requirement**: `{ schedule: ["manage_own"] }`. Doctors get 403 Forbidden when attempting to modify another doctor's schedule.
+- **Payload**: `{ id, dayOfWeek?, startTime?, endTime?, slotDurationMins?, isActive? }`
+- **Response**: `{ success: true, schedule: {...} }`
 
-### 6. `DELETE /api/crm/appointments/[id]`
-- **Purpose**: IDOR-hardened appointment cancellation with compound filter `eq(organizationId, clinicId) AND eq(id, id)`.
-- **RBAC Requirement**: `{ appointment: ["cancel"] }`
-- **Response**: `{ success: true, message: "Appointment successfully cancelled", appointment: {...} }` or HTTP 404.
+### 6. `GET /api/crm/schedules/blocks`
+- **Purpose**: List doctor calendar leaves and temporary slot blocks.
+- **RBAC Requirement**: `{ schedule: ["read"] }`
+- **Query Params**: `doctorId?`, `fromDate?`, `toDate?`
+- **Response**: `{ success: true, count, blocks: [...] }`
 
-### 7. `GET /api/crm/patients`
-- **Purpose**: Retrieve patient directory scoped strictly to active clinic organization.
-- **RBAC Requirement**: `{ patient: ["read"] }`
-- **Response**: `{ success: true, clinicId, role, count, patients: [...] }`
+### 7. `POST /api/crm/schedules/blocks`
+- **Purpose**: Register a temporary doctor slot block (leave, meeting, break).
+- **RBAC Requirement**: `{ schedule: ["manage_own"] }`. Doctors may only block their own slots; Receptionists get 403.
+- **Payload**: `{ doctorId, startAt, endAt, reason?, createdVia? }`
+- **Response**: `{ success: true, block: {...} }` with HTTP 201.
 
-### 8. `POST /api/crm/patients`
-- **Purpose**: Register new patient master record scoped strictly to active clinic organization.
-- **RBAC Requirement**: `{ patient: ["create"] }`
-- **Payload**: `{ fullName, gender, phone, dateOfBirth?, age?, email?, address?, bloodGroup? }`
-- **Response**: `{ success: true, patient: {...} }` with HTTP 201.
+### 8. `DELETE /api/crm/schedules/blocks`
+- **Purpose**: Delete a doctor slot block.
+- **RBAC Requirement**: `{ schedule: ["manage_own"] }`
+- **Query Params**: `id=<blockUuid>`
+- **Response**: `{ success: true, message: "Slot block removed successfully" }`
 
-### 9. `GET /api/crm/patients/[id]`
-- **Purpose**: IDOR-hardened patient record fetch with compound filter `eq(organizationId, clinicId) AND eq(id, id)`.
-- **RBAC Requirement**: `{ patient: ["read"] }`
-- **Response**: `{ success: true, clinicId, role, patient: {...} }` or HTTP 404 if not in current tenant.
+### 9. `GET /api/crm/catalog/medicines`
+- **Purpose**: Search drug formulary. If `q` is provided, executes pg_trgm fuzzy matching returning similarity `score` and `needsReview`.
+- **RBAC Requirement**: `{ knowledge: ["read"] }`
+- **Query Params**: `q?`, `limit?`
+- **Response**: `{ success: true, count, medicines: [...] }`
 
-### 10. `PATCH /api/crm/patients/[id]`
-- **Purpose**: IDOR-hardened patient record update with compound filter `eq(organizationId, clinicId) AND eq(id, id)`.
-- **RBAC Requirement**: `{ patient: ["update"] }`
-- **Payload**: `{ fullName?, gender?, phone?, allergies?, chronicConditions?, address? }`
-- **Response**: `{ success: true, patient: {...} }` or HTTP 404.
+### 10. `POST /api/crm/catalog/medicines`
+- **Purpose**: Add an approved drug to clinic formulary master.
+- **RBAC Requirement**: `{ knowledge: ["manage"] }`. Only Owner & Admin permitted; Receptionist & Doctor get 403.
+- **Payload**: `{ brandName, genericName, strength?, form, defaultDosage?, defaultFrequency?, defaultDurationDays?, isActive? }`
+- **Response**: `{ success: true, medicine: {...} }` with HTTP 201.
 
-### 11. `DELETE /api/crm/patients/[id]`
-- **Purpose**: IDOR-hardened patient record deletion with compound filter `eq(organizationId, clinicId) AND eq(id, id)`.
-- **RBAC Requirement**: `{ patient: ["delete"] }`
-- **Response**: `{ success: true, message: "Patient record successfully deleted", patient: {...} }` or HTTP 404.
+### 11. `PATCH /api/crm/catalog/medicines`
+- **Purpose**: Update an approved drug entry.
+- **RBAC Requirement**: `{ knowledge: ["manage"] }`
+- **Payload**: `{ id, brandName?, genericName?, strength?, form?, defaultDosage?, defaultFrequency?, defaultDurationDays?, isActive? }`
+- **Response**: `{ success: true, medicine: {...} }`
 
-### 12. `GET /api/webhooks/whatsapp` & `POST /api/webhooks/whatsapp`
-- **Purpose**: Meta Webhook verification handshake and incoming message / delivery status ingestion.
+### 12. `GET /api/crm/catalog/tariffs`
+- **Purpose**: List or fuzzy match clinical service tariffs and procedure charge master.
+- **RBAC Requirement**: `{ billing: ["read"] }`
+- **Query Params**: `q?`, `limit?`
+- **Response**: `{ success: true, count, tariffs: [...] }`
+
+### 13. `POST /api/crm/catalog/tariffs`
+- **Purpose**: Create a new clinical service tariff or procedure.
+- **RBAC Requirement**: `{ billing: ["void"] }`. Owner & Admin permitted; Receptionist & Doctor get 403 Forbidden.
+- **Payload**: `{ name, category, price, taxRate?, hsnSacCode?, isActive? }`
+- **Response**: `{ success: true, tariff: {...} }` with HTTP 201.
+
+### 14. `PATCH /api/crm/catalog/tariffs`
+- **Purpose**: Update tariff pricing or tax rate.
+- **RBAC Requirement**: `{ billing: ["void"] }`
+- **Payload**: `{ id, name?, category?, price?, taxRate?, hsnSacCode?, isActive? }`
+- **Response**: `{ success: true, tariff: {...} }`

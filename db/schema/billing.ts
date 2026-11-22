@@ -3,6 +3,7 @@ import { organizations } from "./organizations";
 import { branches } from "./branches";
 import { patients } from "./patients";
 import { profiles } from "./profiles";
+import { appointments } from "./appointments";
 import type { InvoiceItem } from "@/types/hms";
 
 export const invoices = pgTable(
@@ -19,9 +20,13 @@ export const invoices = pgTable(
     patientId: uuid("patient_id")
       .notNull()
       .references(() => patients.id, { onDelete: "cascade" }),
+    appointmentId: uuid("appointment_id").references(() => appointments.id, { onDelete: "set null" }),
     billerId: uuid("biller_id")
       .notNull()
       .references(() => profiles.id, { onDelete: "cascade" }),
+    status: text("status", {
+      enum: ["DRAFT", "ISSUED", "PAID", "VOID"],
+    }).default("ISSUED").notNull(),
     invoiceType: text("invoice_type", {
       enum: ["opd", "ipd", "pharmacy", "lab", "combined"],
     }).notNull(),

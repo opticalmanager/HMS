@@ -16,9 +16,18 @@ export * from "./services";
 export * from "./whatsapp";
 export * from "./audit";
 
+// Step 2 Core Master Data & Scheduling Tables
+export * from "./clinic-profiles";
+export * from "./doctors";
+export * from "./schedules";
+export * from "./catalog";
+export * from "./prescriptions";
+export * from "./outbox";
+export * from "./ai-audit";
+
 import { relations } from "drizzle-orm";
 import { organizations } from "./organizations";
-import { member, invitation } from "./auth";
+import { user, member, invitation } from "./auth";
 import { branches } from "./branches";
 import { profiles } from "./profiles";
 import { patients } from "./patients";
@@ -31,13 +40,140 @@ import { hospitalServices } from "./services";
 import { whatsappMessages } from "./whatsapp";
 import { auditLogs } from "./audit";
 
+import { clinicProfiles } from "./clinic-profiles";
+import { doctors } from "./doctors";
+import { doctorSchedules, doctorSlotBlocks } from "./schedules";
+import { medicineMaster, serviceTariffs } from "./catalog";
+import { prescriptions } from "./prescriptions";
+import { webhookOutbox } from "./outbox";
+import { aiAuditLogs } from "./ai-audit";
+
 // Organization Relations
-export const organizationsRelations = relations(organizations, ({ many }) => ({
+export const organizationsRelations = relations(organizations, ({ one, many }) => ({
   branches: many(branches),
   profiles: many(profiles),
   patients: many(patients),
   members: many(member),
   invitations: many(invitation),
+  clinicProfile: one(clinicProfiles, {
+    fields: [organizations.id],
+    references: [clinicProfiles.organizationId],
+  }),
+  doctors: many(doctors),
+  doctorSchedules: many(doctorSchedules),
+  doctorSlotBlocks: many(doctorSlotBlocks),
+  medicines: many(medicineMaster),
+  serviceTariffs: many(serviceTariffs),
+  prescriptions: many(prescriptions),
+  outbox: many(webhookOutbox),
+  aiAuditLogs: many(aiAuditLogs),
+}));
+
+// Clinic Profile Relations
+export const clinicProfilesRelations = relations(clinicProfiles, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [clinicProfiles.organizationId],
+    references: [organizations.id],
+  }),
+}));
+
+// Doctor Relations
+export const doctorsRelations = relations(doctors, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [doctors.organizationId],
+    references: [organizations.id],
+  }),
+  user: one(user, {
+    fields: [doctors.userId],
+    references: [user.id],
+  }),
+  schedules: many(doctorSchedules),
+  slotBlocks: many(doctorSlotBlocks),
+  appointments: many(appointments),
+  prescriptions: many(prescriptions),
+}));
+
+// Doctor Schedules Relations
+export const doctorSchedulesRelations = relations(doctorSchedules, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [doctorSchedules.organizationId],
+    references: [organizations.id],
+  }),
+  doctor: one(doctors, {
+    fields: [doctorSchedules.doctorId],
+    references: [doctors.id],
+  }),
+}));
+
+// Doctor Slot Blocks Relations
+export const doctorSlotBlocksRelations = relations(doctorSlotBlocks, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [doctorSlotBlocks.organizationId],
+    references: [organizations.id],
+  }),
+  doctor: one(doctors, {
+    fields: [doctorSlotBlocks.doctorId],
+    references: [doctors.id],
+  }),
+  createdByUser: one(user, {
+    fields: [doctorSlotBlocks.createdByUserId],
+    references: [user.id],
+  }),
+}));
+
+// Master Catalog Relations
+export const medicineMasterRelations = relations(medicineMaster, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [medicineMaster.organizationId],
+    references: [organizations.id],
+  }),
+}));
+
+export const serviceTariffsRelations = relations(serviceTariffs, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [serviceTariffs.organizationId],
+    references: [organizations.id],
+  }),
+}));
+
+// Prescription Relations
+export const prescriptionsRelations = relations(prescriptions, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [prescriptions.organizationId],
+    references: [organizations.id],
+  }),
+  appointment: one(appointments, {
+    fields: [prescriptions.appointmentId],
+    references: [appointments.id],
+  }),
+  doctor: one(doctors, {
+    fields: [prescriptions.doctorId],
+    references: [doctors.id],
+  }),
+  patient: one(patients, {
+    fields: [prescriptions.patientId],
+    references: [patients.id],
+  }),
+  approvedByUser: one(user, {
+    fields: [prescriptions.approvedByUserId],
+    references: [user.id],
+  }),
+}));
+
+// Webhook Outbox Relations
+export const webhookOutboxRelations = relations(webhookOutbox, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [webhookOutbox.organizationId],
+    references: [organizations.id],
+  }),
+}));
+
+// AI Audit Logs Relations
+export const aiAuditLogsRelations = relations(aiAuditLogs, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [aiAuditLogs.organizationId],
+    references: [organizations.id],
+  }),
 }));
 
 // Branch Relations
@@ -81,22 +217,25 @@ export const patientsRelations = relations(patients, ({ one, many }) => ({
   consultations: many(opdConsultations),
   ipdAdmissions: many(ipdAdmissions),
   invoices: many(invoices),
+  prescriptions: many(prescriptions),
 }));
 
 // Appointment Relations
-export const appointmentsRelations = relations(appointments, ({ one }) => ({
+export const appointmentsRelations = relations(appointments, ({ one, many }) => ({
   patient: one(patients, {
     fields: [appointments.patientId],
     references: [patients.id],
   }),
-  doctor: one(profiles, {
+  doctor: one(doctors, {
     fields: [appointments.doctorId],
-    references: [profiles.id],
+    references: [doctors.id],
   }),
   branch: one(branches, {
     fields: [appointments.branchId],
     references: [branches.id],
   }),
+  prescriptions: many(prescriptions),
+  invoices: many(invoices),
 }));
 
 // OPD Consultation Relations
@@ -161,6 +300,10 @@ export const invoicesRelations = relations(invoices, ({ one, many }) => ({
   biller: one(profiles, {
     fields: [invoices.billerId],
     references: [profiles.id],
+  }),
+  appointment: one(appointments, {
+    fields: [invoices.appointmentId],
+    references: [appointments.id],
   }),
   payments: many(payments),
 }));
