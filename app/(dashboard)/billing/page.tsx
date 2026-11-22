@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import {
   Receipt,
   Plus,
@@ -12,6 +13,7 @@ import {
   Printer,
   CheckCircle2,
   AlertTriangle,
+  BookOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,6 +28,7 @@ import { formatCurrencyINR, formatClinicalDate } from "@/utils/formatting";
 import type { Invoice } from "@/types/hms";
 
 export default function BillingPage() {
+  const router = useRouter();
   const store = useClinicalStore();
   const [activeTab, setActiveTab] = React.useState("create");
   const [search, setSearch] = React.useState("");
@@ -87,6 +90,17 @@ export default function BillingPage() {
               <TabsTrigger value="drawer">Cashier Shift Drawer</TabsTrigger>
             </TabsList>
           </Tabs>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => router.push("/settings/catalog")}
+            className="text-xs gap-1.5 h-8 font-medium text-slate-700 hover:text-blue-600"
+            title="Browse and manage service tariffs & medicine prices"
+          >
+            <BookOpen className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Tariff Catalog</span>
+          </Button>
         </div>
       </div>
 

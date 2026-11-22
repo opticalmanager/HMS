@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Users2, Plus, Search, ShieldCheck, Check, X, ShieldAlert, Award, Power } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Users2, Plus, Search, ShieldCheck, Check, X, ShieldAlert, Award, Power, CalendarDays } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -42,6 +43,7 @@ const RBAC_PERMISSIONS_LIST: Array<{ perm: RbacPermission; label: string }> = [
 ];
 
 export default function StaffPage() {
+  const router = useRouter();
   const store = useClinicalStore();
   const [activeTab, setActiveTab] = React.useState("directory");
   const [search, setSearch] = React.useState("");
@@ -86,9 +88,20 @@ export default function StaffPage() {
           </Tabs>
 
           <Button
+            variant="outline"
+            size="sm"
+            onClick={() => router.push("/settings/schedules")}
+            className="text-xs gap-1.5 h-8 font-medium text-slate-700 hover:text-blue-600"
+            title="Configure doctor weekly schedules and leaves"
+          >
+            <CalendarDays className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Doctor Schedules</span>
+          </Button>
+
+          <Button
             size="sm"
             onClick={() => setAddModalOpen(true)}
-            className="bg-[#2563EB] hover:bg-blue-700 text-xs gap-1.5 font-semibold ml-2"
+            className="bg-[#2563EB] hover:bg-blue-700 text-xs gap-1.5 font-semibold h-8"
           >
             <Plus className="h-3.5 w-3.5" /> Add Staff Member
           </Button>

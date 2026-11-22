@@ -122,14 +122,16 @@ Before marking any task complete, verify and report:
      - **System architecture, external services, or core stack:** Update `docs/architecture.md` and `docs/tech_stack.md`.
      - **Overall project status & module completion:** Update `docs/overview.md`.
    - Never consider a feature complete until its corresponding documentation in `docs/` has been updated to maintain an accurate project audit trail.
-6. **Mandatory Navigation Exposure for Every Screen (Zero Orphan Pages Rule)**:
-   - Whenever any new screen or sub-route is implemented in `app/`, it is strictly prohibited to leave it as an orphan URL accessible only by typing the address bar.
-   - Every new route MUST simultaneously be wired into:
-     1. **The primary sidebar navigation (`AppSidebar.tsx`)**: Either as a top-level module or nested under an expandable active parent tree.
-     2. **The module's shared sub-navigation/tab bar (`SettingsNav.tsx` or parent module tab strip)**: Permitting 1-click horizontal switching between all sibling subpages.
-     3. **The Global Command Palette (`CommandPalette.tsx` / `Ctrl+K`)**: With search keywords and descriptions.
-     4. **The Topbar user menu (`AppTopbar.tsx`) or parent dashboard quick action cards**.
-   - No task touching UI routes may be marked complete without verifying that users can reach the page in 1–2 clicks from anywhere in the application.
+6. **Smart Information Hierarchy & Contextual Discoverability (Zero Orphan Pages Rule)**:
+   - **Zero Orphan Pages:** Every screen and sub-route in `app/` must have intuitive, discoverable UI access paths. Leaving any route accessible only by manually typing a raw URL into the browser address bar is strictly prohibited.
+   - **Clean Primary Sidebar (Zero Navigation Clutter):**
+     - The primary sidebar (`AppSidebar.tsx`) is reserved EXCLUSIVELY for top-level, high-frequency core modules (e.g. Dashboard, Appointments, OPD, IPD, Billing, Pharmacy, Reports, WhatsApp, Staff, Settings).
+     - **NEVER clutter the primary sidebar with nested sub-menus, sub-settings, or granular action links.**
+   - **Context-First Access Placement:**
+     - **Module Landing Hubs & Sub-Navigation:** Secondary screens and sub-routes (e.g., `/settings/*`, `/reports/*`, `/billing/*`) belong in their parent module's overview hub and/or shared horizontal tab strips (e.g. `SettingsNav.tsx`) for 1-click sibling switching.
+     - **In-Workflow Entry Buttons:** Place navigation buttons or action links strictly where they naturally fit within clinical or administrative workflows (e.g., Doctor Schedules accessible from Appointment calendar actions or Staff roster; Tariff Catalog accessible from Billing), avoiding redundant action buttons across multiple headers.
+     - **Global Command Palette (`Ctrl+K`):** All secondary pages, operational settings, and clinical shortcuts must be indexed in `CommandPalette.tsx` for fast zero-clutter keyboard spotlight navigation.
+     - **Topbars & Menus:** Keep Topbar dropdowns lean and focused on top-level entry points (e.g., `Clinic Settings`, `Register New Clinic`, `Sign Out`) rather than enumerating every sub-route.
 7. **Omnichannel Responsive Design (Mobile, Tablet & Desktop PC Ergonomics)**:
    - Every screen, form, table, dialog, and dashboard component must be built mobile-first and adapt cleanly across all screen breakpoints (`sm: 640px`, `md: 768px`, `lg: 1024px`, `xl: 1280px+`):
      - **Mobile (< 768px - Smartphones):**

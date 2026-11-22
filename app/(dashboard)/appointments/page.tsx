@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import {
   Calendar as CalendarIcon,
   Plus,
@@ -45,6 +46,7 @@ import { PrintDayScheduleModal } from "@/components/appointments/PrintDaySchedul
 import { AppointmentDetailsPopover } from "@/components/appointments/AppointmentDetailsPopover";
 
 export default function AppointmentsPage() {
+  const router = useRouter();
   const store = useClinicalStore();
 
   const doctorList = React.useMemo(() => {
@@ -334,6 +336,14 @@ export default function AppointmentsPage() {
                 >
                   <TableIcon className="h-4 w-4 text-blue-600" />
                   <span>{showTableView ? "Hide Classic Table" : "Show Classic Table"}</span>
+                </button>
+                <div className="h-px bg-slate-100 my-1" />
+                <button
+                  onClick={() => router.push("/settings/schedules")}
+                  className="w-full text-left px-3.5 py-2 text-xs hover:bg-slate-50 flex items-center gap-2 cursor-pointer text-slate-700"
+                >
+                  <CalendarDays className="h-4 w-4 text-blue-600" />
+                  <span>Doctor Schedules & Leaves</span>
                 </button>
               </div>
             )}

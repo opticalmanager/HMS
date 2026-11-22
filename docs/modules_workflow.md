@@ -29,7 +29,7 @@
      - **Master Catalog & Tariffs (`/settings/catalog`)**: Formularies for prescription drugs (`medicine_master`) with `pg_trgm` fuzzy matching, and clinic service tariffs (`service_tariffs`) with GST calculations.
      - **Clinic Staff & RBAC (`/settings/team`)**: Staff membership, invitation status, and role management.
      - **Hospital Branding & Letterhead (`/settings`)**: A4 letterhead designer, document sequence codes, branch GSTIN, and ABDM gateway.
-   - All 5 panels are unified via `components/shell/SettingsNav.tsx` (1-click tab switching), linked via the sidebar settings sub-navigation tree, indexed in the `Ctrl+K` Global Command Palette, and accessible via the Topbar user profile dropdown.
+   - All 5 panels are unified via `components/shell/SettingsNav.tsx` (1-click tab switching), accessed directly from the `/settings` Overview Hub cards, indexed in the `Ctrl+K` Global Command Palette, linked via contextual in-workflow action buttons (e.g. from Appointments, Staff, and Billing), and accessible via the Topbar user profile dropdown without sidebar clutter.
 6. **Multi-Origin & Reverse Proxy Resilience**:
    - `lib/auth.ts` dynamically validates incoming request origins against trusted local patterns (`localhost:*`, `127.0.0.1:*`, private LAN subnets) and production domains, eliminating `Invalid origin` rejections across reverse proxies, Docker standalone environments, and local dev ports.
 
