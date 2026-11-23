@@ -26,6 +26,7 @@ export function CopilotWorkspace() {
 
   // Context State
   const [isLoadingContext, setIsLoadingContext] = React.useState(true);
+  const [contextError, setContextError] = React.useState<string | null>(null);
   const [doctors, setDoctors] = React.useState<any[]>([]);
   const [selectedDoctorId, setSelectedDoctorId] = React.useState<string>("");
   const [queue, setQueue] = React.useState<any[]>([]);
@@ -67,6 +68,7 @@ export function CopilotWorkspace() {
     async (patientId?: string, doctorId?: string, appointmentId?: string | null) => {
       try {
         setIsLoadingContext(true);
+        setContextError(null);
         const params = new URLSearchParams();
         if (patientId) params.set("patientId", patientId);
         if (doctorId) params.set("doctorId", doctorId);
@@ -75,8 +77,10 @@ export function CopilotWorkspace() {
         if (effectiveAppointmentId) params.set("appointmentId", effectiveAppointmentId);
 
         const res = await fetch(`/api/crm/copilot/context?${params.toString()}`);
-        if (!res.ok) throw new Error("Failed to load copilot context");
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || "Failed to load copilot context");
+        }
 
         setDoctors(data.doctors || []);
         setQueue(data.todayQueue || []);
@@ -93,6 +97,7 @@ export function CopilotWorkspace() {
         }
       } catch (err: any) {
         console.error("Context load error:", err);
+        setContextError(err.message || "Failed to load clinic copilot context.");
       } finally {
         setIsLoadingContext(false);
       }
@@ -348,6 +353,21 @@ export function CopilotWorkspace() {
             </strong>
           </div>
         </div>
+
+        {contextError && (
+          <div className="mx-4 mt-2 p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+              <span>{contextError}</span>
+            </div>
+            <button
+              onClick={() => loadContext()}
+              className="text-[#2563EB] hover:underline font-semibold cursor-pointer"
+            >
+              Retry
+            </button>
+          </div>
+        )}
 
         {/* Tab 1: Voice Dictation & HITL Drafts */}
         {activeTab === "dictation" ? (

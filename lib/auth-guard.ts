@@ -155,26 +155,48 @@ export async function requireClinicSession(
     throw new UnauthorizedError();
   }
 
-  // 2. Resolve active organization or auto-activate first clinic
+  // 2. Resolve active organization or fallback to user's clinic from DB
   let clinicId = session.session.activeOrganizationId;
-  if (!clinicId && options?.session === undefined) {
-    try {
-      const orgs = await auth.api.listOrganizations({
-        headers: reqHeaders,
-      });
-      if (orgs && orgs.length > 0) {
-        const firstOrg = orgs[0];
-        await auth.api.setActiveOrganization({
-          headers: reqHeaders,
-          body: {
-            organizationId: firstOrg.id,
-          },
-        });
-        clinicId = firstOrg.id;
-      }
-    } catch {
-      // Auto-activation failed; proceed to check clinicId
+  let role: ClinicRole | undefined = options?.role;
+  let memberId = options?.memberId || `mem-${session.user.id}`;
+
+  if (!role) {
+    const { member } = await import("@/db/schema/auth");
+    const { db } = await import("@/lib/drizzle");
+    const { eq, and } = await import("drizzle-orm");
+
+    let memberRecord;
+    if (clinicId) {
+      const [m] = await db
+        .select()
+        .from(member)
+        .where(and(eq(member.organizationId, clinicId), eq(member.userId, session.user.id)))
+        .limit(1);
+      memberRecord = m;
     }
+
+    if (!memberRecord) {
+      // Fallback: Resolve user's primary clinic membership from PostgreSQL
+      const [m] = await db
+        .select()
+        .from(member)
+        .where(eq(member.userId, session.user.id))
+        .limit(1);
+      memberRecord = m;
+      if (memberRecord) {
+        clinicId = memberRecord.organizationId;
+      }
+    }
+
+    if (!memberRecord || !clinicId) {
+      if (shouldRedirect) {
+        redirect("/onboarding");
+      }
+      throw new NoActiveClinicError();
+    }
+
+    role = (memberRecord.role as ClinicRole) || "receptionist";
+    memberId = memberRecord.id;
   }
 
   if (!clinicId) {
@@ -184,68 +206,15 @@ export async function requireClinicSession(
     throw new NoActiveClinicError();
   }
 
-  // 3. Resolve member role in active clinic
-  let role: ClinicRole;
-  let memberId = options?.memberId || `mem-${session.user.id}`;
-
-  if (options?.role) {
-    role = options.role;
-  } else {
-    try {
-      const member = await auth.api.getActiveMember({
-        headers: reqHeaders,
-      });
-      if (!member || !member.role) {
-        if (shouldRedirect) {
-          redirect("/onboarding");
-        }
-        throw new ForbiddenError("User is not an active member of this clinic organization.");
-      }
-      role = member.role as ClinicRole;
-      if (member.id) {
-        memberId = member.id;
-      }
-    } catch (err) {
-      if (err instanceof ClinicAuthError) throw err;
-      if (typeof err === "object" && err !== null && "digest" in err) throw err;
-      if (shouldRedirect) {
-        redirect("/onboarding");
-      }
-      throw new ForbiddenError("User is not an active member of this clinic organization.");
-    }
-  }
-
   if (!clinicRoles[role]) {
     throw new ForbiddenError(`Access forbidden: Invalid clinical role '${role}'`);
   }
 
-  // 4. Validate permissions if required
+  // 3. Validate permissions if required
   if (permission) {
-    let hasAccess = false;
-    try {
-      const check = await auth.api.hasPermission({
-        headers: reqHeaders,
-        body: {
-          organizationId: clinicId,
-          permissions: permission,
-        },
-      });
-
-      if (check && typeof check.success === "boolean") {
-        hasAccess = check.success;
-      } else {
-        const roleDef = clinicRoles[role];
-        hasAccess = !!roleDef?.authorize(permission)?.success;
-      }
-    } catch {
-      const roleDef = clinicRoles[role];
-      if (roleDef) {
-        const authResult = roleDef.authorize(permission);
-        hasAccess = !!authResult?.success;
-      }
-    }
-
-    if (!hasAccess) {
+    const roleDef = clinicRoles[role];
+    const authResult = roleDef?.authorize(permission);
+    if (!authResult?.success) {
       if (shouldRedirect) {
         redirect("/dashboard?error=forbidden");
       }
@@ -258,7 +227,7 @@ export async function requireClinicSession(
   return {
     user: session.user,
     session: session.session,
-    clinicId,
+    clinicId: clinicId as string,
     role,
     memberId,
   };

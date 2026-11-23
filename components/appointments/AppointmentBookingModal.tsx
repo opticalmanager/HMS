@@ -47,8 +47,32 @@ export function AppointmentBookingModal({
   initialDate,
 }: AppointmentBookingModalProps) {
   const store = useClinicalStore();
+  const [realDoctors, setRealDoctors] = React.useState<any[]>([]);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [bookingError, setBookingError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (!open) return;
+    setBookingError(null);
+    fetch("/api/crm/doctors")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.doctors && data.doctors.length > 0) {
+          setRealDoctors(data.doctors);
+        }
+      })
+      .catch(() => {});
+  }, [open]);
 
   const doctors = React.useMemo(() => {
+    if (realDoctors.length > 0) {
+      return realDoctors.map((d) => ({
+        id: d.id,
+        name: `Dr. ${d.fullName}`,
+        dept: d.specialty || "General Medicine",
+        fee: d.consultationFee ? parseFloat(d.consultationFee) : 500,
+      }));
+    }
     const staffDocs = store.staff.filter(
       (s) =>
         s.role === "doctor" ||
@@ -67,7 +91,7 @@ export function AppointmentBookingModal({
       dept: s.department || "General",
       fee: 600,
     }));
-  }, [store.staff]);
+  }, [realDoctors, store.staff]);
 
   const [searchPatient, setSearchPatient] = React.useState("");
   const [selectedPatient, setSelectedPatient] = React.useState<Patient | null>(initialPatient);
@@ -161,83 +185,127 @@ export function AppointmentBookingModal({
     // Strict 10-digit phone enforcement
     const cleanPhone = formData.phone.replace(/\D/g, "");
     if (cleanPhone.length < 10) {
-      alert("Please enter a valid 10-digit mobile number.");
+      setBookingError("Please enter a valid 10-digit mobile number.");
       return;
     }
 
-    const currentTokenCount = store.appointments.length + 100;
-    const uhid = formData.uhid || `UHID-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+    setIsSubmitting(true);
+    setBookingError(null);
 
-    // Ensure patient exists in registry
-    let patientId = selectedPatient?.id;
-    if (!patientId) {
-      patientId = `pat-${Date.now()}`;
-      clinicalStore.addPatient({
-        id: patientId,
-        uhid,
-        organizationId: "org-apex-001",
-        branchId: "br-main-001",
-        fullName: formData.fullName,
-        phone: cleanPhone,
-        gender: "other",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+    try {
+      // 1. Ensure patient exists in PostgreSQL database
+      let patientId = selectedPatient?.id;
+      let uhid = formData.uhid;
+
+      const isUUID =
+        patientId &&
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(patientId);
+
+      if (!isUUID) {
+        const patRes = await fetch("/api/crm/patients", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fullName: formData.fullName.trim(),
+            phone: cleanPhone,
+            gender: "other",
+          }),
+        });
+
+        if (!patRes.ok) {
+          const patErr = await patRes.json().catch(() => ({}));
+          throw new Error(patErr.error || "Failed to register patient in clinic database.");
+        }
+
+        const patData = await patRes.json();
+        patientId = patData.patient.id;
+        uhid = patData.patient.uhid;
+      }
+
+      // 2. Select valid doctor UUID
+      const selectedDoc = doctors.find((d) => d.id === formData.doctorId) || doctors[0];
+      const isDocUUID =
+        selectedDoc?.id &&
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(selectedDoc.id);
+
+      if (!isDocUUID) {
+        throw new Error(
+          "Please select a valid active doctor profile registered in this clinic."
+        );
+      }
+
+      // 3. Create appointment in PostgreSQL database
+      const apptRes = await fetch("/api/crm/appointments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          patientId,
+          doctorId: selectedDoc.id,
+          department: selectedDoc.dept,
+          appointmentDate: formData.appointmentDate,
+          timeSlot: formData.timeSlot,
+          priority: isQuickWalkIn ? "urgent" : formData.priority,
+          chiefComplaints: formData.chiefComplaints || undefined,
+          consultationFee: String(formData.fee || selectedDoc.fee || 500),
+          source: "WEB",
+        }),
       });
-    }
 
-    const record = AppointmentService.createAppointmentRecord(
-      {
-        organizationId: "org-apex-001",
-        branchId: "br-main-001",
-        patientId,
+      if (!apptRes.ok) {
+        const apptErr = await apptRes.json().catch(() => ({}));
+        throw new Error(apptErr.error || "Failed to schedule appointment in clinic database.");
+      }
+
+      const apptData = await apptRes.json();
+      const realAppointment = apptData.appointment;
+
+      // 4. Update in-memory store for backwards compatibility with legacy UI components
+      const record = AppointmentService.createAppointmentRecord(
+        {
+          organizationId: realAppointment.organizationId,
+          branchId: "br-main-001",
+          patientId: patientId!,
+          patientName: formData.fullName,
+          patientPhone: cleanPhone,
+          patientUhid: uhid || "UHID-GEN",
+          doctorId: selectedDoc.id,
+          doctorName: selectedDoc.name,
+          department: selectedDoc.dept,
+          appointmentDate: formData.appointmentDate,
+          timeSlot: formData.timeSlot,
+          priority: isQuickWalkIn ? "urgent" : formData.priority,
+          chiefComplaints: formData.chiefComplaints,
+          consultationFee: formData.fee,
+        },
+        realAppointment.tokenNumber || store.appointments.length + 100
+      );
+      record.id = realAppointment.id;
+
+      if (isQuickWalkIn) {
+        record.status = "arrived";
+        record.isPaid = true;
+      }
+
+      clinicalStore.addAppointment(record);
+
+      // Trigger WhatsApp notification in background
+      WabaService.sendAppointmentConfirmation({
+        phone: cleanPhone,
         patientName: formData.fullName,
-        patientPhone: cleanPhone,
-        patientUhid: uhid,
-        doctorId: formData.doctorId,
-        doctorName: formData.doctorName,
-        department: formData.department,
+        doctorName: selectedDoc.name,
         appointmentDate: formData.appointmentDate,
         timeSlot: formData.timeSlot,
-        priority: isQuickWalkIn ? "urgent" : formData.priority,
-        chiefComplaints: formData.chiefComplaints,
-        consultationFee: formData.fee,
-      },
-      currentTokenCount
-    );
+        tokenNumber: record.tokenNumber,
+        hospitalName: store.settings.hospitalName,
+      }).catch(() => {});
 
-    // If walk-in, set directly to arrived
-    if (isQuickWalkIn) {
-      record.status = "arrived";
-      record.isPaid = true;
+      if (onBookSuccess) onBookSuccess(record);
+      onOpenChange(false);
+    } catch (err: any) {
+      setBookingError(err.message || "Failed to schedule appointment. Please try again.");
+    } finally {
+      setIsSubmitting(false);
     }
-
-    clinicalStore.addAppointment(record);
-
-    // Trigger WhatsApp notification in background
-    WabaService.sendAppointmentConfirmation({
-      phone: cleanPhone,
-      patientName: formData.fullName,
-      doctorName: formData.doctorName,
-      appointmentDate: formData.appointmentDate,
-      timeSlot: formData.timeSlot,
-      tokenNumber: record.tokenNumber,
-      hospitalName: store.settings.hospitalName,
-    }).catch(() => {});
-
-    clinicalStore.logWhatsApp({
-      recipientPhone: cleanPhone,
-      patientName: formData.fullName,
-      templateName: "appointment_confirmation_v1",
-      status: "sent",
-      params: {
-        doctor: formData.doctorName,
-        dateTime: `${formData.appointmentDate} ${formData.timeSlot}`,
-        token: String(record.tokenNumber),
-      },
-    });
-
-    if (onBookSuccess) onBookSuccess(record);
-    onOpenChange(false);
   };
 
   return (
@@ -262,6 +330,12 @@ export function AppointmentBookingModal({
           onKeyDown={(e) => handleEnterNavigation(e)}
           className="space-y-4 py-2"
         >
+          {bookingError && (
+            <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+              <span className="font-semibold">Booking Error:</span>
+              <span>{bookingError}</span>
+            </div>
+          )}
           {/* Patient Autocomplete Search */}
           <div className="relative">
             <label className="text-xs font-medium text-slate-700 block mb-1">
@@ -442,8 +516,16 @@ export function AppointmentBookingModal({
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" className="bg-[#2563EB] hover:bg-blue-700">
-              {isQuickWalkIn ? "Issue Token & Print Slip" : "Generate Token & Confirm Booking"}
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              className="bg-[#2563EB] hover:bg-blue-700 cursor-pointer"
+            >
+              {isSubmitting
+                ? "Saving to Clinic Calendar..."
+                : isQuickWalkIn
+                ? "Issue Token & Print Slip"
+                : "Generate Token & Confirm Booking"}
             </Button>
           </DialogFooter>
         </form>

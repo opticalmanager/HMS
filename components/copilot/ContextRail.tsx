@@ -136,11 +136,15 @@ export function ContextRail({
             onChange={(e) => onSelectDoctor(e.target.value)}
             className="w-full h-8 pl-8 pr-7 text-xs font-semibold rounded-md border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-1 focus:ring-[#2563EB] cursor-pointer appearance-none"
           >
-            {doctors.map((doc) => (
-              <option key={doc.id} value={doc.id}>
-                Dr. {doc.fullName} ({doc.specialty})
-              </option>
-            ))}
+            {doctors.length === 0 ? (
+              <option value="">No Active Doctors in Clinic</option>
+            ) : (
+              doctors.map((doc) => (
+                <option key={doc.id} value={doc.id}>
+                  Dr. {doc.fullName} ({doc.specialty})
+                </option>
+              ))
+            )}
           </select>
           <Stethoscope className="h-4 w-4 text-[#2563EB] absolute left-2.5 top-2 pointer-events-none" />
           <ChevronDown className="h-3.5 w-3.5 text-slate-400 absolute right-2.5 top-2.5 pointer-events-none" />
