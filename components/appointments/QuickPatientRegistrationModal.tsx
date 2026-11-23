@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { clinicalStore } from "@/services/clinical-store";
 import { formatSequenceNumber } from "@/utils/document-series";
 import type { Patient, PatientGender, BloodGroup } from "@/types/hms";
-import { UserPlus, Save, ShieldCheck } from "lucide-react";
+import { UserPlus, Save, ShieldCheck, AlertCircle } from "lucide-react";
 
 interface QuickPatientRegistrationModalProps {
   open: boolean;
@@ -27,6 +27,8 @@ export function QuickPatientRegistrationModal({
   onPatientCreated,
 }: QuickPatientRegistrationModalProps) {
   const [activeTab, setActiveTab] = React.useState<"basic" | "kin">("basic");
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
   const [form, setForm] = React.useState({
     title: "Mr.",
@@ -48,6 +50,7 @@ export function QuickPatientRegistrationModal({
 
   React.useEffect(() => {
     if (open) {
+      setErrorMessage(null);
       setForm({
         title: "Mr.",
         fullName: "",
@@ -80,41 +83,86 @@ export function QuickPatientRegistrationModal({
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.fullName || !form.phone) return;
 
-    const uhidSequence = Math.floor(100 + Math.random() * 900);
-    const generatedUhid = `UHID-2026-0${uhidSequence}`;
+    setIsSubmitting(true);
+    setErrorMessage(null);
 
-    const newPatient: Patient = {
-      id: `pat-${Date.now().toString(36)}`,
-      uhid: generatedUhid,
-      organizationId: "org-apex-001",
-      branchId: "br-main-001",
-      fullName: `${form.title} ${form.fullName}`.trim(),
-      gender: form.gender,
-      age: Number(form.age) || undefined,
-      dateOfBirth: form.dateOfBirth || undefined,
-      phone: form.phone,
-      email: form.email || undefined,
-      bloodGroup: form.bloodGroup,
-      address: form.address,
-      city: form.city,
-      pincode: form.pincode,
-      emergencyContactName: form.emergencyName ? `${form.emergencyName} (${form.emergencyRelation})` : undefined,
-      emergencyContactPhone: form.emergencyPhone || undefined,
-      abhaId: form.abhaId || undefined,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+    try {
+      const cleanPhone = form.phone.replace(/\D/g, "");
+      if (cleanPhone.length < 10) {
+        setErrorMessage("Please enter a valid 10-digit mobile number.");
+        setIsSubmitting(false);
+        return;
+      }
 
-    clinicalStore.addPatient(newPatient);
+      const payload = {
+        fullName: `${form.title} ${form.fullName}`.trim(),
+        gender: form.gender,
+        phone: cleanPhone,
+        age: form.age ? Number(form.age) : undefined,
+        dateOfBirth: form.dateOfBirth || undefined,
+        email: form.email ? form.email.trim() : undefined,
+        bloodGroup: form.bloodGroup,
+        address: form.address || undefined,
+        city: form.city || undefined,
+        pincode: form.pincode || undefined,
+        emergencyContactName: form.emergencyName
+          ? `${form.emergencyName} (${form.emergencyRelation})`
+          : undefined,
+        emergencyContactPhone: form.emergencyPhone || undefined,
+        emergencyContactRelation: form.emergencyRelation || undefined,
+        abhaId: form.abhaId || undefined,
+      };
 
-    if (onPatientCreated) {
-      onPatientCreated(newPatient);
+      const res = await fetch("/api/crm/patients", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to register patient in clinic database.");
+      }
+
+      const registeredPatient = data.patient;
+
+      // Update in-memory store for backwards compatibility with prototype components
+      clinicalStore.addPatient({
+        id: registeredPatient.id,
+        uhid: registeredPatient.uhid,
+        organizationId: registeredPatient.organizationId,
+        branchId: registeredPatient.branchId || "br-main-001",
+        fullName: registeredPatient.fullName,
+        gender: registeredPatient.gender,
+        age: registeredPatient.age || undefined,
+        dateOfBirth: registeredPatient.dateOfBirth || undefined,
+        phone: registeredPatient.phone,
+        email: registeredPatient.email || undefined,
+        bloodGroup: registeredPatient.bloodGroup,
+        address: registeredPatient.address,
+        city: registeredPatient.city,
+        pincode: registeredPatient.pincode,
+        emergencyContactName: registeredPatient.emergencyContactName,
+        emergencyContactPhone: registeredPatient.emergencyContactPhone,
+        abhaId: registeredPatient.abhaId,
+        createdAt: registeredPatient.createdAt,
+        updatedAt: registeredPatient.updatedAt,
+      });
+
+      if (onPatientCreated) {
+        onPatientCreated(registeredPatient);
+      }
+      onOpenChange(false);
+    } catch (err: any) {
+      setErrorMessage(err.message || "Failed to create patient. Please try again.");
+    } finally {
+      setIsSubmitting(false);
     }
-    onOpenChange(false);
   };
 
   return (
@@ -163,6 +211,12 @@ export function QuickPatientRegistrationModal({
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 pt-3">
+          {errorMessage && (
+            <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+              <span>{errorMessage}</span>
+            </div>
+          )}
           {activeTab === "basic" ? (
             <>
               {/* Full Name & Title */}
@@ -371,8 +425,14 @@ export function QuickPatientRegistrationModal({
             <Button type="button" variant="outline" size="sm" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" size="sm" className="bg-[#2563EB] hover:bg-blue-700 text-xs gap-1.5">
-              <Save className="h-3.5 w-3.5" /> Save &amp; Generate UHID
+            <Button
+              type="submit"
+              size="sm"
+              disabled={isSubmitting}
+              className="bg-[#2563EB] hover:bg-blue-700 text-xs gap-1.5 cursor-pointer"
+            >
+              <Save className="h-3.5 w-3.5" />
+              {isSubmitting ? "Registering in Clinic Database..." : "Save & Generate UHID"}
             </Button>
           </DialogFooter>
         </form>

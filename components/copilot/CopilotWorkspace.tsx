@@ -64,13 +64,15 @@ export function CopilotWorkspace() {
 
   // Load clinic encounter context
   const loadContext = React.useCallback(
-    async (patientId?: string, doctorId?: string) => {
+    async (patientId?: string, doctorId?: string, appointmentId?: string | null) => {
       try {
         setIsLoadingContext(true);
         const params = new URLSearchParams();
         if (patientId) params.set("patientId", patientId);
         if (doctorId) params.set("doctorId", doctorId);
-        if (activeAppointmentId) params.set("appointmentId", activeAppointmentId);
+        const effectiveAppointmentId =
+          appointmentId !== undefined ? appointmentId : activeAppointmentId;
+        if (effectiveAppointmentId) params.set("appointmentId", effectiveAppointmentId);
 
         const res = await fetch(`/api/crm/copilot/context?${params.toString()}`);
         if (!res.ok) throw new Error("Failed to load copilot context");
@@ -102,10 +104,19 @@ export function CopilotWorkspace() {
     loadContext(initialPatientId, initialDoctorId);
   }, [loadContext, initialPatientId, initialDoctorId]);
 
-  // Handle switching patient from queue
+  // Handle switching patient from queue or directory
   const handleSelectPatient = (patientId: string, appointmentId?: string) => {
     setActiveAppointmentId(appointmentId || null);
-    loadContext(patientId, selectedDoctorId);
+    if (!patientId) {
+      setSelectedPatient(null);
+      setPrescriptionItems([]);
+      setInvoiceItems([]);
+      setPrescriptionId(undefined);
+      setInvoiceId(undefined);
+      setAllergyAlerts([]);
+      return;
+    }
+    loadContext(patientId, selectedDoctorId, appointmentId);
   };
 
   // Handle audio dictation
