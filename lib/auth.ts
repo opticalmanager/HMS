@@ -13,8 +13,11 @@ export const auth = betterAuth({
   trustedOrigins: async (request?: Request) => {
     const origins: (string | undefined | null)[] = [
       env.NEXT_PUBLIC_APP_URL,
+      "http://localhost",
       "http://localhost:*",
+      "http://127.0.0.1",
       "http://127.0.0.1:*",
+      "http://0.0.0.0",
       "http://0.0.0.0:*",
       "http://192.168.*:*",
       "http://10.*:*",
