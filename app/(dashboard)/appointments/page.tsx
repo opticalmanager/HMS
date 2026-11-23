@@ -21,6 +21,7 @@ import {
   CalendarRange,
   Columns,
   Search,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -252,6 +253,22 @@ export default function AppointmentsPage() {
           >
             <Users className="h-3.5 w-3.5" />
             <span>Patient Queue</span>
+          </button>
+
+          {/* AI Copilot Deep-Link */}
+          <button
+            onClick={() =>
+              router.push(
+                selectedDoctorId && selectedDoctorId !== "all"
+                  ? `/dashboard/copilot?doctorId=${selectedDoctorId}`
+                  : "/dashboard/copilot"
+              )
+            }
+            className="px-3 py-1.5 rounded-full border border-white/80 bg-white/15 text-white font-semibold hover:bg-white/25 transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
+            title="Open Doctor AI Copilot workspace"
+          >
+            <Sparkles className="h-3.5 w-3.5 text-amber-300" />
+            <span>AI Copilot</span>
           </button>
 
           {/* Clinic / Doctor Dropdown */}

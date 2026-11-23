@@ -1,5 +1,5 @@
 import "server-only";
-import { eq, and, asc, desc, gte, lte, inArray, lt, gt } from "drizzle-orm";
+import { eq, and, asc, desc, gte, lte, inArray, lt, gt, sql } from "drizzle-orm";
 import { db } from "@/lib/drizzle";
 import {
   doctorSchedules,
@@ -220,7 +220,7 @@ export class ScheduleService {
           eq(appointments.doctorId, input.doctorId),
           inArray(appointments.status, ["scheduled", "arrived", "in_consultation"]),
           lt(appointments.slotStart, parsedEnd),
-          gt(appointments.slotEnd, parsedStart)
+          gt(sql`COALESCE(${appointments.slotEnd}, ${appointments.slotStart} + INTERVAL '15 minutes')`, parsedStart.toISOString())
         )
       );
 

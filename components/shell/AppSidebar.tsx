@@ -19,11 +19,13 @@ import {
   Activity,
   ChevronLeft,
   ChevronRight,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { label: "AI Copilot", href: "/dashboard/copilot", icon: Sparkles, badge: "AI" },
   { label: "Appointments", href: "/appointments", icon: CalendarDays },
   { label: "OPD Clinical", href: "/opd", icon: Stethoscope },
   { label: "IPD Wards & Beds", href: "/ipd", icon: BedDouble },
@@ -96,10 +98,13 @@ export function AppSidebar({ collapsed = false, onToggleCollapse }: AppSidebarPr
           </button>
         )}
         {NAV_ITEMS.map((item) => {
+          const isDashboard = item.href === "/dashboard";
           const isSettings = item.href === "/settings";
-          const isActive = isSettings
+          const isActive = isDashboard
+            ? pathname === "/dashboard"
+            : isSettings
             ? pathname?.startsWith("/settings")
-            : pathname === item.href || pathname?.startsWith(`${item.href}/`);
+            : pathname === item.href || (item.href !== "/dashboard" && pathname?.startsWith(`${item.href}/`));
           const Icon = item.icon;
           return (
             <Link
@@ -115,7 +120,23 @@ export function AppSidebar({ collapsed = false, onToggleCollapse }: AppSidebarPr
               )}
             >
               <Icon className={cn("h-4 w-4 shrink-0", isActive ? "text-white" : "text-slate-500")} />
-              {!collapsed && <span className="truncate">{item.label}</span>}
+              {!collapsed && (
+                <>
+                  <span className="truncate">{item.label}</span>
+                  {(item as any).badge && (
+                    <span
+                      className={cn(
+                        "ml-auto px-1.5 py-0.2 rounded text-[10px] font-bold tracking-wider uppercase",
+                        isActive
+                          ? "bg-white/20 text-white"
+                          : "bg-indigo-50 text-indigo-600 border border-indigo-200/60"
+                      )}
+                    >
+                      {(item as any).badge}
+                    </span>
+                  )}
+                </>
+              )}
             </Link>
           );
         })}

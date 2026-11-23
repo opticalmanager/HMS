@@ -16,6 +16,7 @@ export interface AiAuditEntry {
   tokensOut?: number;
   status: "SUCCESS" | "ERROR" | "BLOCKED";
   errorCode?: string | null;
+  fallbackUsed?: boolean;
 }
 
 /**
@@ -83,7 +84,11 @@ export async function recordAiAudit(entry: AiAuditEntry): Promise<void> {
     const tokensOut = entry.tokensOut || 0;
     const estimatedCostUsd = estimateCostUsd(entry.model, tokensIn, tokensOut);
 
-    const sanitizedToolCalls = sanitizeToolCallsForAudit(entry.toolCalls);
+    let sanitizedToolCalls = sanitizeToolCallsForAudit(entry.toolCalls);
+    if (entry.fallbackUsed) {
+      const fallbackMeta = { name: "model_router", arguments: { fallbackUsed: true } };
+      sanitizedToolCalls = sanitizedToolCalls ? [...sanitizedToolCalls, fallbackMeta] : [fallbackMeta];
+    }
 
     await db.insert(aiAuditLogs).values({
       organizationId: entry.organizationId,

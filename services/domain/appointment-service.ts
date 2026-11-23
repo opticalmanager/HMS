@@ -417,6 +417,7 @@ export class AppointmentDomainService {
             doctorId: input.doctorId,
             date: input.appointmentDate,
             maxSlots: 3,
+            filterPastSlots: true,
           });
         } catch {
           suggestedSlots = [];
@@ -504,6 +505,7 @@ export class AppointmentDomainService {
             doctorId: input.doctorId,
             date: input.appointmentDate,
             maxSlots: 3,
+            filterPastSlots: true,
           });
         } catch {
           suggestedSlots = [];
@@ -568,6 +570,12 @@ export class AppointmentDomainService {
   ): Promise<AppointmentEntity | null> {
     const isRescheduling = Boolean(input.appointmentDate || input.timeSlot || input.slotStart);
 
+    // Fetch existing appointment to guarantee accurate tenant checks, doctor association, and slot recalculation
+    const existing = await AppointmentDomainService.getAppointmentById(clinicId, appointmentId);
+    if (!existing) {
+      return null;
+    }
+
     const updateValues: Partial<NewAppointmentEntity> = {
       updatedAt: new Date(),
     };
@@ -580,19 +588,78 @@ export class AppointmentDomainService {
     if (input.consultationFee !== undefined) updateValues.consultationFee = input.consultationFee;
     if (input.isPaid !== undefined) updateValues.isPaid = input.isPaid;
 
+    const targetDate = input.appointmentDate || existing.appointmentDate;
+    const targetTime = input.timeSlot || existing.timeSlot;
+
+    let parsedStart: Date | null = null;
+    let parsedEnd: Date | null = null;
+
     if (input.slotStart !== undefined) {
-      updateValues.slotStart = input.slotStart
+      parsedStart = input.slotStart
         ? input.slotStart instanceof Date
           ? input.slotStart
           : new Date(input.slotStart)
         : null;
+      updateValues.slotStart = parsedStart;
     }
+
     if (input.slotEnd !== undefined) {
-      updateValues.slotEnd = input.slotEnd
+      parsedEnd = input.slotEnd
         ? input.slotEnd instanceof Date
           ? input.slotEnd
           : new Date(input.slotEnd)
         : null;
+      updateValues.slotEnd = parsedEnd;
+    }
+
+    if (isRescheduling && !input.slotStart) {
+      // Recalculate slotStart and slotEnd in clinic timezone
+      const [profile] = await db
+        .select({ timezone: clinicProfiles.timezone })
+        .from(clinicProfiles)
+        .where(eq(clinicProfiles.organizationId, clinicId))
+        .limit(1);
+      const timeZone = profile?.timezone || "Asia/Kolkata";
+
+      parsedStart = localToUtc(targetDate, targetTime, timeZone);
+      parsedEnd = input.slotEnd
+        ? parsedEnd
+        : new Date(parsedStart.getTime() + 15 * 60 * 1000);
+
+      updateValues.slotStart = parsedStart;
+      updateValues.slotEnd = parsedEnd;
+    }
+
+    // Verify doctor slot block conflicts if rescheduling to a new slot
+    if (isRescheduling && parsedStart && parsedEnd) {
+      const conflictingBlocks = await db
+        .select()
+        .from(doctorSlotBlocks)
+        .where(
+          and(
+            eq(doctorSlotBlocks.organizationId, clinicId),
+            eq(doctorSlotBlocks.doctorId, existing.doctorId),
+            lt(doctorSlotBlocks.startAt, parsedEnd),
+            gt(doctorSlotBlocks.endAt, parsedStart)
+          )
+        )
+        .limit(1);
+
+      if (conflictingBlocks.length > 0) {
+        let suggestedSlots: AvailableSlot[] = [];
+        try {
+          suggestedSlots = await AppointmentDomainService.getAvailableSlots({
+            organizationId: clinicId,
+            doctorId: existing.doctorId,
+            date: targetDate,
+            maxSlots: 3,
+            filterPastSlots: true,
+          });
+        } catch {
+          suggestedSlots = [];
+        }
+        throw new SlotBlockedError(conflictingBlocks[0].reason || undefined, suggestedSlots);
+      }
     }
 
     try {
@@ -624,7 +691,22 @@ export class AppointmentDomainService {
     } catch (err: any) {
       const code = err.code || err.cause?.code;
       if (code === "23505") {
-        throw new SlotConflictError("The target slot timestamp is already booked by another appointment.");
+        let suggestedSlots: AvailableSlot[] = [];
+        try {
+          suggestedSlots = await AppointmentDomainService.getAvailableSlots({
+            organizationId: clinicId,
+            doctorId: existing.doctorId,
+            date: targetDate,
+            maxSlots: 3,
+            filterPastSlots: true,
+          });
+        } catch {
+          suggestedSlots = [];
+        }
+        throw new SlotConflictError(
+          `Dr. slot at ${targetTime} (${targetDate}) is already booked by another patient.`,
+          suggestedSlots
+        );
       }
       throw err;
     }

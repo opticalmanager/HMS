@@ -13,7 +13,11 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const isOpd = pathname === "/opd";
+  const isDockedWorkspace =
+    pathname === "/opd" ||
+    pathname === "/dashboard/copilot" ||
+    pathname?.startsWith("/dashboard/copilot") ||
+    pathname === "/copilot";
   const [commandOpen, setCommandOpen] = React.useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
 
@@ -47,8 +51,8 @@ export default function DashboardLayout({
         <main
           className={cn(
             "flex-1 min-w-0",
-            isOpd
-              ? "h-[calc(100vh-3rem)] max-h-[calc(100vh-3rem)] overflow-hidden p-2 flex flex-col"
+            isDockedWorkspace
+              ? "h-[calc(100vh-3.5rem)] max-h-[calc(100vh-3.5rem)] overflow-hidden p-0 sm:p-2 flex flex-col"
               : "overflow-y-auto p-6"
           )}
         >

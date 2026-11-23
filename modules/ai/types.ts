@@ -79,6 +79,7 @@ export interface GenerateTextResponse {
   usage: TokenUsage;
   model: string;
   latencyMs: number;
+  fallbackUsed?: boolean;
 }
 
 export interface GenerateStructuredRequest {
@@ -96,6 +97,7 @@ export interface GenerateStructuredResponse<T> {
   model: string;
   latencyMs: number;
   rawText?: string;
+  fallbackUsed?: boolean;
 }
 
 export interface GenerateFromAudioRequest {

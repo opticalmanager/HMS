@@ -20,8 +20,9 @@ const CHANNEL_LENGTH_LIMITS: Record<string, number> = {
 };
 
 const PROMPT_INJECTION_PATTERNS: RegExp[] = [
-  /ignore\s+(all\s+)?(previous|prior)\s+instructions/i,
-  /disregard\s+(the\s+)?(previous|system)\s+(instructions|prompt)/i,
+  /ignore\s+(all\s+)?.*?\s*instructions/i,
+  /ignore\s+previous/i,
+  /disregard\s+(the\s+)?(previous|system|all).*?\s*(instructions|prompt)/i,
   /act\s+as\s+(an?\s+)?(system|admin|root|developer|owner)/i,
   /pretend\s+you\s+are\s+(an?\s+)?(admin|system|root)/i,
   /you\s+are\s+now\s+(an?\s+)?(admin|system|unrestricted)/i,

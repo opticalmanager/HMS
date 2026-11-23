@@ -19,6 +19,8 @@ export const ExtractedMedicineSchema = z.object({
     .describe("Duration of treatment in days (e.g. 5 for 5 days, 7 for 1 week)"),
   instructions: z
     .string()
+    .nullish()
+    .default("")
     .describe("Specific administration instructions (e.g. After food, Before breakfast, At bedtime, With warm water)"),
   confidence: z
     .number()

@@ -397,6 +397,10 @@ export class BillingDomainService {
       return existing;
     }
 
+    if (existing.status === "VOID") {
+      throw new CannotModifyIssuedInvoiceError("Cannot issue a VOID invoice.");
+    }
+
     return await db.transaction(async (tx) => {
       const [issued] = await tx
         .update(invoices)
@@ -407,10 +411,27 @@ export class BillingDomainService {
         .where(
           and(
             eq(invoices.organizationId, organizationId),
-            eq(invoices.id, invoiceId)
+            eq(invoices.id, invoiceId),
+            eq(invoices.status, "DRAFT")
           )
         )
         .returning();
+
+      if (!issued) {
+        const [current] = await tx
+          .select({ status: invoices.status })
+          .from(invoices)
+          .where(and(eq(invoices.organizationId, organizationId), eq(invoices.id, invoiceId)))
+          .limit(1);
+
+        if (current?.status === "ISSUED" || current?.status === "PAID") {
+          return current as any;
+        }
+        if (current?.status === "VOID") {
+          throw new CannotModifyIssuedInvoiceError("Cannot issue a VOID invoice.");
+        }
+        throw new InvoiceNotFoundError();
+      }
 
       // Enqueue invoice.issued outbox event
       await enqueueWebhookEvent(tx, {
@@ -446,6 +467,10 @@ export class BillingDomainService {
       throw new InvoiceNotFoundError();
     }
 
+    if (existing.status === "VOID") {
+      return existing;
+    }
+
     return await db.transaction(async (tx) => {
       const [voided] = await tx
         .update(invoices)
@@ -457,10 +482,15 @@ export class BillingDomainService {
         .where(
           and(
             eq(invoices.organizationId, organizationId),
-            eq(invoices.id, invoiceId)
+            eq(invoices.id, invoiceId),
+            sql`status != 'VOID'`
           )
         )
         .returning();
+
+      if (!voided) {
+        return existing;
+      }
 
       await enqueueWebhookEvent(tx, {
         organizationId,

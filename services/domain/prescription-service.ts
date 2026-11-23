@@ -253,10 +253,25 @@ export class PrescriptionDomainService {
         .where(
           and(
             eq(prescriptions.organizationId, organizationId),
-            eq(prescriptions.id, prescriptionId)
+            eq(prescriptions.id, prescriptionId),
+            eq(prescriptions.status, "DRAFT")
           )
         )
         .returning();
+
+      if (!approved) {
+        // Concurrency guard: check if already approved by another worker
+        const [current] = await tx
+          .select({ status: prescriptions.status })
+          .from(prescriptions)
+          .where(and(eq(prescriptions.organizationId, organizationId), eq(prescriptions.id, prescriptionId)))
+          .limit(1);
+
+        if (current?.status === "APPROVED") {
+          throw new AlreadyApprovedError("Prescription is already approved.");
+        }
+        throw new PrescriptionNotFoundError();
+      }
 
       // Enqueue prescription.approved event into webhook_outbox inside same transaction
       await enqueueWebhookEvent(tx, {

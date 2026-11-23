@@ -19,12 +19,14 @@ async function main() {
   console.log("-----------------------------------------------------------------");
 
   const provider = new GeminiProvider(apiKey);
+  const fastModel = process.env.AI_MODEL_FAST || "gemini-3.5-flash-lite";
+  const reasoningModel = process.env.AI_MODEL_REASONING || "gemini-3.5-flash";
 
   // 1. Smoke test: Text Generation
-  console.log("\n1. Testing Text Generation (Fast Tier: gemini-2.5-flash-lite)...");
+  console.log(`\n1. Testing Text Generation (Fast Tier: ${fastModel})...`);
   try {
     const textRes = await provider.generateText({
-      model: "gemini-2.5-flash-lite",
+      model: fastModel,
       systemPrompt: "You are a helpful clinical assistant. Be brief.",
       userPrompt: "What is the primary indication and adult oral dose of Paracetamol?",
     });
@@ -39,7 +41,7 @@ async function main() {
   }
 
   // 2. Smoke test: Structured Visit Extraction
-  console.log("2. Testing Structured Consultation Extraction (gemini-2.5-flash)...");
+  console.log(`2. Testing Structured Consultation Extraction (${reasoningModel})...`);
   const testDictation = `
     Patient Rajesh Kumar, 42 male, comes in with complaint of high grade fever since 3 days with chills, severe sir dard and body ache.
     Provisional diagnosis is Acute Viral Fever.
@@ -51,7 +53,7 @@ async function main() {
   try {
     const structuredRes = await provider.generateStructured(
       {
-        model: "gemini-2.5-flash",
+        model: reasoningModel,
         systemPrompt: DOCTOR_DICTATION_PROMPT_V1,
         userPrompt: testDictation,
       },
@@ -67,6 +69,35 @@ async function main() {
     console.log("Latency:", structuredRes.latencyMs, "ms");
   } catch (err: any) {
     console.error("Structured extraction failed:", err?.message || err);
+  }
+
+  // 3. Smoke test: Multimodal Audio Extraction (Demonstrating generateStructuredFromAudio)
+  console.log("\n3. Testing Multimodal Audio API Interface (generateStructuredFromAudio)...");
+  // Construct a minimal 1-second silent 16kHz mono PCM WAV header for testing API schema and payload serialization
+  const sampleWavHeader = Buffer.from([
+    0x52, 0x49, 0x46, 0x46, 0x24, 0x00, 0x00, 0x00, 0x57, 0x41, 0x56, 0x66, 0x6d, 0x74, 0x20,
+    0x10, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x80, 0x3e, 0x00, 0x00, 0x00, 0x7d, 0x00, 0x00,
+    0x02, 0x00, 0x10, 0x00, 0x64, 0x61, 0x74, 0x61, 0x00, 0x00, 0x00, 0x00
+  ]).toString("base64");
+
+  try {
+    const audioRes = await provider.generateStructuredFromAudio(
+      {
+        model: reasoningModel,
+        audioBase64: sampleWavHeader,
+        mimeType: "audio/wav",
+        systemPrompt: DOCTOR_DICTATION_PROMPT_V1,
+        userPrompt: "Extract consultation dictation if present or report empty/clean structure.",
+      },
+      VisitExtractionSchema
+    );
+
+    console.log("Success! Audio extraction response received from Gemini:");
+    console.log("Diagnosis:", audioRes.data.diagnosis);
+    console.log("Model:", audioRes.model);
+    console.log("Latency:", audioRes.latencyMs, "ms");
+  } catch (err: any) {
+    console.log("Audio endpoint response:", err?.message || err);
   }
 
   console.log("\nGemini Smoke Test Finished.");

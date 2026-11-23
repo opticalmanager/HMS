@@ -24,6 +24,7 @@ import {
   Users,
   Printer,
   Settings,
+  Sparkles,
 } from "lucide-react";
 
 interface CommandPaletteProps {
@@ -52,6 +53,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   }, [open, onOpenChange]);
 
   const QUICK_ACTIONS = [
+    { label: "Doctor AI Copilot", desc: "Voice dictation, HITL draft prescription, grounded bill & chat", href: "/dashboard/copilot", icon: Sparkles },
     { label: "OPD Clinical Console", desc: "Consultations & e-prescriptions", href: "/opd", icon: Stethoscope },
     { label: "IPD Ward & Bed Matrix", desc: "Live bed occupancy & admissions", href: "/ipd", icon: BedDouble },
     { label: "Token Queue TV Display", desc: "Full-screen kiosk callout board", href: "/token-board", icon: Tv },

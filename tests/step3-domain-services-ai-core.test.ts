@@ -309,6 +309,67 @@ describe("Step 3: Remaining Domain Services, Outbound WhatsApp Outbox & Gemini-F
       const latestCancelled = cancelledEvents[cancelledEvents.length - 1];
       assert.strictEqual(latestCancelled.payloadJson.appointmentId, appointment.id);
     });
+
+    it("reschedules appointment to new date/time, recalculating UTC slotStart and enqueuing appointment.rescheduled", async () => {
+      // 1. Create initial appointment on Wednesday at 09:45
+      const { appointment } = await AppointmentDomainService.createAppointment(testOrgId, {
+        patientId: testPatientId,
+        doctorId: testDoctorId,
+        department: "General Medicine",
+        appointmentDate: testDate,
+        timeSlot: "09:45",
+        tokenNumber: 6,
+      });
+
+      // 2. Reschedule to 10:45 on same date without passing slotStart
+      const rescheduled = await AppointmentDomainService.rescheduleAppointment(testOrgId, appointment.id, {
+        appointmentDate: testDate,
+        timeSlot: "10:45",
+      });
+
+      assert.ok(rescheduled);
+      assert.strictEqual(rescheduled.timeSlot, "10:45");
+      assert.ok(rescheduled.slotStart);
+      // 10:45 AM IST is 05:15 UTC
+      assert.strictEqual(rescheduled.slotStart.toISOString(), "2026-11-25T05:15:00.000Z");
+
+      // Verify appointment.rescheduled event in webhook_outbox
+      const rescheduleEvents = await db
+        .select()
+        .from(webhookOutbox)
+        .where(
+          and(
+            eq(webhookOutbox.organizationId, testOrgId),
+            eq(webhookOutbox.eventType, "appointment.rescheduled")
+          )
+        );
+      assert.ok(rescheduleEvents.length >= 1);
+      const latest = rescheduleEvents[rescheduleEvents.length - 1];
+      assert.strictEqual(latest.payloadJson.appointmentId, appointment.id);
+      assert.strictEqual(latest.payloadJson.timeSlot, "10:45");
+
+      // 3. Test rescheduling to a blocked slot throws SlotBlockedError with suggestions
+      await assert.rejects(
+        async () => {
+          await AppointmentDomainService.rescheduleAppointment(testOrgId, appointment.id, {
+            appointmentDate: testDate,
+            timeSlot: "10:15", // Blocked by "Clinical Grand Rounds" 10:00-10:30 block
+          });
+        },
+        (err: any) => err instanceof SlotBlockedError && err.status === 409 && Array.isArray(err.suggestedSlots)
+      );
+
+      // 4. Test rescheduling to an already booked slot throws SlotConflictError with suggestions
+      await assert.rejects(
+        async () => {
+          await AppointmentDomainService.rescheduleAppointment(testOrgId, appointment.id, {
+            appointmentDate: testDate,
+            timeSlot: "09:30", // Booked by earlier test
+          });
+        },
+        (err: any) => err instanceof SlotConflictError && err.status === 409 && Array.isArray(err.suggestedSlots)
+      );
+    });
   });
 
   // =========================================================================
@@ -392,6 +453,41 @@ describe("Step 3: Remaining Domain Services, Outbound WhatsApp Outbox & Gemini-F
       );
       assert.ok(targetEvent, "Must have enqueued reschedule_needed event for conflicting appointment");
       assert.strictEqual(targetEvent.payloadJson.patientName, "Aarav Sharma");
+    });
+
+    it("identifies overlapping appointment conflicts even when appointment slotEnd is null", async () => {
+      // Create appointment with explicit null slotEnd
+      const [aptWithNullEnd] = await db
+        .insert(appointments)
+        .values({
+          organizationId: testOrgId,
+          patientId: testPatientId,
+          doctorId: testDoctorId,
+          department: "General Medicine",
+          appointmentDate: "2026-11-26",
+          timeSlot: "14:00",
+          slotStart: new Date("2026-11-26T08:30:00.000Z"), // 14:00 IST
+          slotEnd: null,
+          tokenNumber: 99,
+          status: "scheduled",
+        })
+        .returning();
+
+      const blockStart = new Date("2026-11-26T08:00:00.000Z"); // 13:30 IST
+      const blockEnd = new Date("2026-11-26T09:00:00.000Z");   // 14:30 IST
+
+      const result = await ScheduleService.blockDoctorSlot(testOrgId, {
+        doctorId: testDoctorId,
+        startAt: blockStart,
+        endAt: blockEnd,
+        reason: "Afternoon Faculty Meeting",
+        dryRun: true,
+      });
+
+      assert.strictEqual(result.requiresConfirmation, true);
+      const found = result.conflicts.find((c) => c.appointmentId === aptWithNullEnd.id);
+      assert.ok(found, "Conflict must be detected for appointment with null slotEnd");
+      assert.strictEqual(found.patientName, "Aarav Sharma");
     });
   });
 
@@ -609,6 +705,54 @@ describe("Step 3: Remaining Domain Services, Outbound WhatsApp Outbox & Gemini-F
         (err: unknown) => err instanceof CannotModifyIssuedInvoiceError
       );
     });
+
+    it("guards against double-approval race conditions and avoids duplicate outbox events", async () => {
+      // Attempting to approve the already approved prescription again must fail
+      await assert.rejects(
+        async () => {
+          await PrescriptionDomainService.approvePrescription({
+            organizationId: testOrgId,
+            prescriptionId: createdPrescriptionId,
+            approvedByUserId: testDoctorUserId,
+          });
+        },
+        (err: unknown) => err instanceof AlreadyApprovedError
+      );
+    });
+
+    it("rejects issuing a VOID invoice with CannotModifyIssuedInvoiceError", async () => {
+      // 1. Create a draft invoice and void it
+      const draft = await BillingDomainService.createDraftInvoiceFromItems({
+        organizationId: testOrgId,
+        patientId: testPatientId,
+        items: [
+          {
+            spokenServiceName: "General Consultation",
+            quantity: 1,
+            customAmountIfStated: null,
+            confidence: 0.9,
+          },
+        ],
+      });
+
+      const voided = await BillingDomainService.voidInvoice({
+        organizationId: testOrgId,
+        invoiceId: draft.id,
+        reason: "Patient cancelled consult",
+      });
+      assert.strictEqual(voided.status, "VOID");
+
+      // 2. Attempting to issue a VOID invoice must throw
+      await assert.rejects(
+        async () => {
+          await BillingDomainService.issueInvoice({
+            organizationId: testOrgId,
+            invoiceId: draft.id,
+          });
+        },
+        (err: unknown) => err instanceof CannotModifyIssuedInvoiceError
+      );
+    });
   });
 
   // =========================================================================
@@ -634,9 +778,12 @@ describe("Step 3: Remaining Domain Services, Outbound WhatsApp Outbox & Gemini-F
       });
 
       // 2. Mock successful fetch (HTTP 200)
-      let receivedHeaders: Record<string, string> = {};
+      const receivedCalls: Array<{ headers: Record<string, string>; body: string }> = [];
       const mockFetch200 = (async (url: string, init?: RequestInit) => {
-        receivedHeaders = (init?.headers as Record<string, string>) || {};
+        receivedCalls.push({
+          headers: (init?.headers as Record<string, string>) || {},
+          body: String(init?.body || ""),
+        });
         return {
           ok: true,
           status: 200,
@@ -646,13 +793,15 @@ describe("Step 3: Remaining Domain Services, Outbound WhatsApp Outbox & Gemini-F
       }) as typeof fetch;
 
       const dispatchResult = await NotificationDomainService.dispatchPendingOutboxEvents({
-        batchSize: 10,
+        batchSize: 20,
         fetchFn: mockFetch200,
       });
 
       assert.ok(dispatchResult.sent >= 1);
-      assert.ok(receivedHeaders["X-CRM-Signature"], "Must include HMAC signature header");
-      assert.strictEqual(receivedHeaders["X-CRM-Event"], "appointment.confirmed");
+      const targetCall = receivedCalls.find((c) => c.headers["X-CRM-Delivery-Id"] === event.id);
+      assert.ok(targetCall, "Must have dispatched the target outbox event");
+      assert.ok(targetCall.headers["X-CRM-Signature"], "Must include HMAC signature header");
+      assert.strictEqual(targetCall.headers["X-CRM-Event"], "appointment.confirmed");
 
       // Verify row in DB is marked SENT
       const [updated] = await db
@@ -831,7 +980,7 @@ describe("Step 3: Remaining Domain Services, Outbound WhatsApp Outbox & Gemini-F
       }
     });
 
-    it("automatically falls back to secondary model on 429 rate limit", async () => {
+    it("automatically falls back to secondary model on 429 rate limit and records fallbackUsed in telemetry", async () => {
       mock.rateLimitCount = 1;
 
       const res = await client.generateStructured(
@@ -845,6 +994,38 @@ describe("Step 3: Remaining Domain Services, Outbound WhatsApp Outbox & Gemini-F
 
       // Successfully returned after fallback
       assert.ok(res.data);
+      assert.strictEqual(res.fallbackUsed, true, "Response must flag fallbackUsed: true");
+
+      // Verify audit log has fallbackUsed recorded
+      const logs = await db
+        .select()
+        .from(aiAuditLogs)
+        .where(
+          and(
+            eq(aiAuditLogs.organizationId, testOrgId),
+            eq(aiAuditLogs.actionType, "doctor_dictation_extract"),
+            eq(aiAuditLogs.status, "SUCCESS")
+          )
+        );
+
+      assert.ok(logs.length >= 1);
+      const latestLog = logs[logs.length - 1];
+      const toolCalls = latestLog.toolCallsJson as any[];
+      assert.ok(toolCalls?.some((t) => t.arguments?.fallbackUsed === true), "Telemetry audit log must record fallbackUsed: true");
+
+      // Test audio extraction rate limit fallback as well
+      mock.rateLimitCount = 1;
+      const audioRes = await client.generateStructuredFromAudio(
+        {
+          organizationId: testOrgId,
+          task: "doctor_dictation_extract",
+          audioBase64: "dGVzdGF1ZGlv",
+          mimeType: "audio/wav",
+        },
+        VisitExtractionSchema
+      );
+      assert.ok(audioRes.data);
+      assert.strictEqual(audioRes.fallbackUsed, true, "Audio extraction must support model fallback with fallbackUsed: true");
     });
 
     it("blocks prompt injection attempts and logs BLOCKED in ai_audit_logs", async () => {

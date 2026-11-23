@@ -74,20 +74,24 @@ export class GeminiProvider implements LLMProvider {
 
   private async executeWithRetry<T>(
     fn: () => Promise<T>,
+    signal?: AbortSignal,
     maxRetries = 3,
     initialDelayMs = 500
   ): Promise<T> {
     let delay = initialDelayMs;
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      if (signal?.aborted) {
+        throw new AiTimeoutError();
+      }
       try {
         return await fn();
       } catch (err: any) {
+        if (signal?.aborted || err?.name === "AbortError") {
+          throw new AiTimeoutError();
+        }
         if (attempt === maxRetries || !this.isTransientError(err)) {
           if (this.isRateLimitError(err)) {
             throw new AiRateLimitError(String(err?.message || err));
-          }
-          if (err?.name === "AbortError") {
-            throw new AiTimeoutError();
           }
           throw err;
         }
@@ -109,6 +113,13 @@ export class GeminiProvider implements LLMProvider {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
+    const signals: AbortSignal[] = [controller.signal];
+    if (req.signal) signals.push(req.signal);
+    const combinedSignal = (AbortSignal as any).any ? (AbortSignal as any).any(signals) : controller.signal;
+    if (req.signal && !(AbortSignal as any).any) {
+      req.signal.addEventListener("abort", () => controller.abort(), { once: true });
+    }
+
     const startTime = Date.now();
     try {
       const result = await this.executeWithRetry(async () => {
@@ -118,9 +129,10 @@ export class GeminiProvider implements LLMProvider {
           config: {
             systemInstruction: req.systemPrompt,
             temperature: req.temperature ?? 0.2,
+            abortSignal: combinedSignal,
           },
         });
-      });
+      }, combinedSignal);
 
       const latencyMs = Date.now() - startTime;
       const text = result.text || "";
@@ -148,11 +160,21 @@ export class GeminiProvider implements LLMProvider {
     const model = req.model || env.AI_MODEL_REASONING;
     const timeoutMs = req.timeoutMs || env.AI_REQUEST_TIMEOUT_MS;
 
-    const rawJsonSchema = zodToJsonSchema(zodSchema, { target: "openApi3" }) as any;
+    const rawJsonSchema = zodToJsonSchema(zodSchema, {
+      target: "openApi3",
+      $refStrategy: "none",
+    }) as any;
     delete rawJsonSchema["$schema"];
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    const signals: AbortSignal[] = [controller.signal];
+    if (req.signal) signals.push(req.signal);
+    const combinedSignal = (AbortSignal as any).any ? (AbortSignal as any).any(signals) : controller.signal;
+    if (req.signal && !(AbortSignal as any).any) {
+      req.signal.addEventListener("abort", () => controller.abort(), { once: true });
+    }
 
     const startTime = Date.now();
     try {
@@ -165,9 +187,10 @@ export class GeminiProvider implements LLMProvider {
             responseMimeType: "application/json",
             responseSchema: rawJsonSchema,
             temperature: req.temperature ?? 0.1,
+            abortSignal: combinedSignal,
           },
         });
-      });
+      }, combinedSignal);
 
       const latencyMs = Date.now() - startTime;
       const rawText = result.text || "{}";
@@ -218,11 +241,21 @@ export class GeminiProvider implements LLMProvider {
     const model = req.model || env.AI_MODEL_REASONING;
     const timeoutMs = req.timeoutMs || env.AI_REQUEST_TIMEOUT_MS;
 
-    const rawJsonSchema = zodToJsonSchema(zodSchema, { target: "openApi3" }) as any;
+    const rawJsonSchema = zodToJsonSchema(zodSchema, {
+      target: "openApi3",
+      $refStrategy: "none",
+    }) as any;
     delete rawJsonSchema["$schema"];
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    const signals: AbortSignal[] = [controller.signal];
+    if (req.signal) signals.push(req.signal);
+    const combinedSignal = (AbortSignal as any).any ? (AbortSignal as any).any(signals) : controller.signal;
+    if (req.signal && !(AbortSignal as any).any) {
+      req.signal.addEventListener("abort", () => controller.abort(), { once: true });
+    }
 
     const startTime = Date.now();
     try {
@@ -250,9 +283,10 @@ export class GeminiProvider implements LLMProvider {
             responseMimeType: "application/json",
             responseSchema: rawJsonSchema,
             temperature: req.temperature ?? 0.1,
+            abortSignal: combinedSignal,
           },
         });
-      });
+      }, combinedSignal);
 
       const latencyMs = Date.now() - startTime;
       const rawText = result.text || "{}";
@@ -299,6 +333,7 @@ export class GeminiProvider implements LLMProvider {
       config: {
         systemInstruction: req.systemPrompt,
         temperature: req.temperature ?? 0.3,
+        abortSignal: req.signal,
       },
     });
 

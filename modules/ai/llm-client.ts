@@ -86,6 +86,7 @@ export class LlmClient {
     // 2. Model Routing
     const resolution = ModelRouter.resolveModelForTask(options.task);
     const startMs = Date.now();
+    let fallbackUsed = false;
 
     try {
       let res: GenerateTextResponse;
@@ -100,7 +101,8 @@ export class LlmClient {
         });
       } catch (err: any) {
         // Fallback retry if primary fails with transient error
-        if (err instanceof AiRateLimitError || err?.status === 500 || err?.status === 503) {
+        if (err instanceof AiRateLimitError || err?.status === 500 || err?.status === 503 || err?.code === "AI_RATE_LIMIT_EXCEEDED") {
+          fallbackUsed = true;
           res = await this.provider.generateText({
             model: resolution.fallbackModel,
             systemPrompt: options.systemPrompt,
@@ -130,11 +132,13 @@ export class LlmClient {
         latencyMs: Date.now() - startMs,
         tokensIn: res.usage.tokensIn,
         tokensOut: res.usage.tokensOut,
+        fallbackUsed,
         status: "SUCCESS",
       });
 
       return {
         ...res,
+        fallbackUsed,
         text: finalText,
       };
     } catch (error: any) {
@@ -147,6 +151,7 @@ export class LlmClient {
         actionType: options.task,
         model: resolution.primaryModel,
         latencyMs: Date.now() - startMs,
+        fallbackUsed,
         status: "ERROR",
         errorCode: error?.code || error?.message,
       });
@@ -184,6 +189,7 @@ export class LlmClient {
     // 2. Model Routing
     const resolution = ModelRouter.resolveModelForTask(options.task);
     const startMs = Date.now();
+    let fallbackUsed = false;
 
     try {
       let res: GenerateStructuredResponse<T>;
@@ -200,7 +206,8 @@ export class LlmClient {
           schema
         );
       } catch (err: any) {
-        if (err instanceof AiRateLimitError || err?.status === 500 || err?.status === 503) {
+        if (err instanceof AiRateLimitError || err?.status === 500 || err?.status === 503 || err?.code === "AI_RATE_LIMIT_EXCEEDED") {
+          fallbackUsed = true;
           res = await this.provider.generateStructured(
             {
               model: resolution.fallbackModel,
@@ -229,10 +236,14 @@ export class LlmClient {
         latencyMs: Date.now() - startMs,
         tokensIn: res.usage.tokensIn,
         tokensOut: res.usage.tokensOut,
+        fallbackUsed,
         status: "SUCCESS",
       });
 
-      return res;
+      return {
+        ...res,
+        fallbackUsed,
+      };
     } catch (error: any) {
       await recordAiAudit({
         organizationId: options.organizationId,
@@ -243,6 +254,7 @@ export class LlmClient {
         actionType: options.task,
         model: resolution.primaryModel,
         latencyMs: Date.now() - startMs,
+        fallbackUsed,
         status: "ERROR",
         errorCode: error?.code || error?.message,
       });
@@ -261,21 +273,44 @@ export class LlmClient {
     const channel = options.channel || "WEB_COPILOT";
     const resolution = ModelRouter.resolveModelForTask(options.task);
     const startMs = Date.now();
+    let fallbackUsed = false;
 
     try {
-      const res = await this.provider.generateStructuredFromAudio(
-        {
-          model: resolution.primaryModel,
-          audioBase64: options.audioBase64,
-          mimeType: options.mimeType,
-          systemPrompt: options.systemPrompt,
-          userPrompt: options.userPrompt,
-          temperature: options.temperature,
-          timeoutMs: options.timeoutMs,
-          signal: options.signal,
-        },
-        schema
-      );
+      let res: GenerateStructuredResponse<T>;
+      try {
+        res = await this.provider.generateStructuredFromAudio(
+          {
+            model: resolution.primaryModel,
+            audioBase64: options.audioBase64,
+            mimeType: options.mimeType,
+            systemPrompt: options.systemPrompt,
+            userPrompt: options.userPrompt,
+            temperature: options.temperature,
+            timeoutMs: options.timeoutMs,
+            signal: options.signal,
+          },
+          schema
+        );
+      } catch (err: any) {
+        if (err instanceof AiRateLimitError || err?.status === 500 || err?.status === 503 || err?.code === "AI_RATE_LIMIT_EXCEEDED") {
+          fallbackUsed = true;
+          res = await this.provider.generateStructuredFromAudio(
+            {
+              model: resolution.fallbackModel,
+              audioBase64: options.audioBase64,
+              mimeType: options.mimeType,
+              systemPrompt: options.systemPrompt,
+              userPrompt: options.userPrompt,
+              temperature: options.temperature,
+              timeoutMs: options.timeoutMs,
+              signal: options.signal,
+            },
+            schema
+          );
+        } else {
+          throw err;
+        }
+      }
 
       // Non-blocking telemetry
       await recordAiAudit({
@@ -289,10 +324,14 @@ export class LlmClient {
         latencyMs: Date.now() - startMs,
         tokensIn: res.usage.tokensIn,
         tokensOut: res.usage.tokensOut,
+        fallbackUsed,
         status: "SUCCESS",
       });
 
-      return res;
+      return {
+        ...res,
+        fallbackUsed,
+      };
     } catch (error: any) {
       await recordAiAudit({
         organizationId: options.organizationId,
@@ -303,6 +342,108 @@ export class LlmClient {
         actionType: options.task,
         model: resolution.primaryModel,
         latencyMs: Date.now() - startMs,
+        fallbackUsed,
+        status: "ERROR",
+        errorCode: error?.code || error?.message,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Streams text with inbound guardrails, task model routing, automatic fallback,
+   * and non-blocking audit logging.
+   */
+  async *streamText(options: LlmCallOptions): AsyncGenerator<string, void, unknown> {
+    const traceId = options.traceId || crypto.randomUUID();
+    const channel = options.channel || "WEB_COPILOT";
+
+    // 1. Inbound Guardrail
+    const inputCheck = validateAiInput(options.userPrompt, channel);
+    if (!inputCheck.allowed) {
+      await recordAiAudit({
+        organizationId: options.organizationId,
+        traceId,
+        channel: channel as any,
+        actorRole: options.actorRole,
+        actorId: options.actorId,
+        actionType: options.task,
+        status: "BLOCKED",
+        errorCode: inputCheck.reason,
+      });
+      throw new AiPromptBlockedError(inputCheck.reason);
+    }
+
+    // 2. Model Routing
+    const resolution = ModelRouter.resolveModelForTask(options.task);
+    const startMs = Date.now();
+    let fallbackUsed = false;
+    let fullOutput = "";
+
+    try {
+      try {
+        const stream = this.provider.streamText({
+          model: resolution.primaryModel,
+          systemPrompt: options.systemPrompt,
+          userPrompt: options.userPrompt,
+          temperature: options.temperature,
+          timeoutMs: options.timeoutMs,
+          signal: options.signal,
+        });
+        for await (const chunk of stream) {
+          fullOutput += chunk;
+          yield chunk;
+        }
+      } catch (err: any) {
+        if (
+          err instanceof AiRateLimitError ||
+          err?.status === 500 ||
+          err?.status === 503 ||
+          err?.code === "AI_RATE_LIMIT_EXCEEDED"
+        ) {
+          fallbackUsed = true;
+          const stream = this.provider.streamText({
+            model: resolution.fallbackModel,
+            systemPrompt: options.systemPrompt,
+            userPrompt: options.userPrompt,
+            temperature: options.temperature,
+            timeoutMs: options.timeoutMs,
+            signal: options.signal,
+          });
+          for await (const chunk of stream) {
+            fullOutput += chunk;
+            yield chunk;
+          }
+        } else {
+          throw err;
+        }
+      }
+
+      await recordAiAudit({
+        organizationId: options.organizationId,
+        traceId,
+        channel: channel as any,
+        actorRole: options.actorRole,
+        actorId: options.actorId,
+        actionType: options.task,
+        model: fallbackUsed ? resolution.fallbackModel : resolution.primaryModel,
+        latencyMs: Date.now() - startMs,
+        tokensIn: 0,
+        tokensOut: Math.ceil(fullOutput.length / 4),
+        fallbackUsed,
+        status: "SUCCESS",
+      });
+    } catch (error: any) {
+      await recordAiAudit({
+        organizationId: options.organizationId,
+        traceId,
+        channel: channel as any,
+        actorRole: options.actorRole,
+        actorId: options.actorId,
+        actionType: options.task,
+        model: resolution.primaryModel,
+        latencyMs: Date.now() - startMs,
+        fallbackUsed,
         status: "ERROR",
         errorCode: error?.code || error?.message,
       });

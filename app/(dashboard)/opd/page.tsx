@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import {
   Edit3,
   Info,
@@ -17,6 +18,7 @@ import {
   Upload,
   Printer,
   X,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -241,6 +243,16 @@ export default function OpdPage() {
 
         {/* Right: Functional Action Pill Buttons */}
         <div className="flex items-center gap-1 xl:gap-1.5 shrink-0">
+          {/* AI Copilot Deep-Link Button */}
+          <Link
+            href={`/dashboard/copilot?patientId=${selectedAppointment.patientId}&appointmentId=${selectedAppointment.id}&doctorId=${selectedAppointment.doctorId}`}
+            className="px-2.5 py-1 rounded-full border border-indigo-300 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 font-bold text-[11px] transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
+            title="Open patient in Doctor AI Copilot"
+          >
+            <Sparkles className="h-3 w-3 text-indigo-600" />
+            <span>AI Copilot</span>
+          </Link>
+
           {/* 1. Bill Button (Red/Coral border) */}
           <button
             onClick={() => setBillingModalOpen(true)}
