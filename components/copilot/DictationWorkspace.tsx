@@ -1,7 +1,19 @@
 "use client";
 
 import * as React from "react";
-import { Mic, MicOff, Square, Play, Sparkles, Loader2, FileText, Volume2, RotateCcw } from "lucide-react";
+import {
+  Mic,
+  MicOff,
+  Square,
+  Sparkles,
+  Loader2,
+  FileText,
+  Lock,
+  RefreshCw,
+  AlertCircle,
+  X,
+  CheckCircle2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -33,6 +45,13 @@ export function DictationWorkspace({
   const [showTextInput, setShowTextInput] = React.useState(false);
   const [micError, setMicError] = React.useState<string | null>(null);
 
+  // Permission Lifecycle State: 'granted' | 'prompt' | 'denied' | 'unsupported' | 'unknown'
+  const [micPermission, setMicPermission] = React.useState<
+    "granted" | "prompt" | "denied" | "unsupported" | "unknown"
+  >("unknown");
+  const [isRequestingPermission, setIsRequestingPermission] = React.useState(false);
+  const [showPermissionHelp, setShowPermissionHelp] = React.useState(false);
+
   const mediaRecorderRef = React.useRef<MediaRecorder | null>(null);
   const audioChunksRef = React.useRef<Blob[]>([]);
   const timerRef = React.useRef<NodeJS.Timeout | null>(null);
@@ -53,6 +72,44 @@ export function DictationWorkspace({
         audioContextRef.current.close().catch(() => {});
       }
     };
+  }, []);
+
+  // Check initial browser microphone permission state & listen for changes
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    if (!navigator?.mediaDevices?.getUserMedia) {
+      setMicPermission("unsupported");
+      return;
+    }
+
+    if (navigator.permissions && navigator.permissions.query) {
+      navigator.permissions
+        .query({ name: "microphone" as any })
+        .then((permissionStatus) => {
+          setMicPermission(permissionStatus.state);
+          if (permissionStatus.state === "granted") {
+            setMicError(null);
+            setShowPermissionHelp(false);
+          } else if (permissionStatus.state === "denied") {
+            setMicError("Microphone permission was denied by the browser.");
+          }
+
+          // Live reactive update when user toggles permission in browser address bar
+          permissionStatus.onchange = () => {
+            setMicPermission(permissionStatus.state);
+            if (permissionStatus.state === "granted") {
+              setMicError(null);
+              setShowPermissionHelp(false);
+            } else if (permissionStatus.state === "denied") {
+              setMicError("Microphone permission was denied by the browser.");
+            }
+          };
+        })
+        .catch(() => {
+          setMicPermission("unknown");
+        });
+    }
   }, []);
 
   // Visualizer loop for live audio waveform
@@ -88,8 +145,27 @@ export function DictationWorkspace({
   const startRecording = async () => {
     setMicError(null);
     audioChunksRef.current = [];
+    setIsRequestingPermission(true);
+
     try {
+      // Check for secure context
+      if (
+        typeof window !== "undefined" &&
+        !window.isSecureContext &&
+        window.location.hostname !== "localhost" &&
+        window.location.hostname !== "127.0.0.1"
+      ) {
+        throw new Error(
+          "Microphone recording requires a secure origin (HTTPS or localhost). Please access the clinic portal via HTTPS."
+        );
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      // Permission successfully granted!
+      setMicPermission("granted");
+      setShowPermissionHelp(false);
+      setMicError(null);
 
       // Setup Web Audio API Analyser
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
@@ -104,7 +180,9 @@ export function DictationWorkspace({
       // Setup MediaRecorder
       const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
         ? "audio/webm;codecs=opus"
-        : "audio/webm";
+        : MediaRecorder.isTypeSupported("audio/webm")
+        ? "audio/webm"
+        : "audio/mp4";
 
       const recorder = new MediaRecorder(stream, { mimeType });
       mediaRecorderRef.current = recorder;
@@ -145,8 +223,27 @@ export function DictationWorkspace({
         });
       }, 1000);
     } catch (err: any) {
-      setMicError(err?.message || "Could not access microphone. Please check browser permissions.");
       setIsRecording(false);
+      const errName = err?.name || "";
+      const errMsg = err?.message || "";
+
+      if (
+        errName === "NotAllowedError" ||
+        errName === "PermissionDeniedError" ||
+        errMsg.toLowerCase().includes("permission denied")
+      ) {
+        setMicPermission("denied");
+        setMicError("Microphone permission was denied by your browser.");
+        setShowPermissionHelp(true);
+      } else if (errName === "NotFoundError" || errName === "DevicesNotFoundError") {
+        setMicError("No microphone detected on this computer. Please plug in a microphone or headset.");
+      } else if (errName === "NotReadableError" || errName === "TrackStartError") {
+        setMicError("Microphone is currently locked by another application (e.g. Teams, Zoom, or Discord).");
+      } else {
+        setMicError(errMsg || "Could not access microphone. Please check browser permissions.");
+      }
+    } finally {
+      setIsRequestingPermission(false);
     }
   };
 
@@ -156,6 +253,20 @@ export function DictationWorkspace({
     }
     setIsRecording(false);
     if (timerRef.current) clearInterval(timerRef.current);
+  };
+
+  const handleMicButtonClick = () => {
+    if (isRecording) {
+      stopRecording();
+      return;
+    }
+
+    if (micPermission === "denied") {
+      setShowPermissionHelp(true);
+      return;
+    }
+
+    startRecording();
   };
 
   const handleTextSubmit = async (e: React.FormEvent) => {
@@ -221,7 +332,7 @@ export function DictationWorkspace({
         </div>
 
         {/* Mic Visualizer / Record Hero Area */}
-        <div className="flex flex-col items-center justify-center py-4 px-2 bg-slate-50/60 rounded-xl border border-slate-200/80 mb-3">
+        <div className="flex flex-col items-center justify-center py-4 px-3 bg-slate-50/60 rounded-xl border border-slate-200/80 mb-3">
           {isRecording ? (
             <div className="flex flex-col items-center space-y-3 w-full max-w-md">
               {/* Waveform Canvas */}
@@ -262,34 +373,135 @@ export function DictationWorkspace({
               </p>
             </div>
           ) : (
-            <div className="flex flex-col items-center space-y-2">
-              <button
-                type="button"
-                onClick={startRecording}
-                disabled={disabled}
-                className={cn(
-                  "h-16 w-16 rounded-full flex items-center justify-center text-white shadow-md transition-all duration-200 cursor-pointer",
-                  disabled
-                    ? "bg-slate-300 cursor-not-allowed"
-                    : "bg-[#2563EB] hover:bg-blue-700 hover:scale-105 active:scale-95 shadow-blue-500/20"
+            <div className="flex flex-col items-center space-y-2 text-center">
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={handleMicButtonClick}
+                  disabled={disabled || isRequestingPermission}
+                  className={cn(
+                    "h-16 w-16 rounded-full flex items-center justify-center text-white shadow-md transition-all duration-200 cursor-pointer",
+                    disabled
+                      ? "bg-slate-300 cursor-not-allowed"
+                      : micPermission === "denied"
+                      ? "bg-amber-600 hover:bg-amber-700 shadow-amber-500/20"
+                      : "bg-[#2563EB] hover:bg-blue-700 hover:scale-105 active:scale-95 shadow-blue-500/20"
+                  )}
+                  title={
+                    micPermission === "denied"
+                      ? "Microphone access blocked - Click to see instructions"
+                      : "Click to start dictating"
+                  }
+                >
+                  {isRequestingPermission ? (
+                    <Loader2 className="h-7 w-7 animate-spin" />
+                  ) : micPermission === "denied" ? (
+                    <MicOff className="h-7 w-7" />
+                  ) : (
+                    <Mic className="h-7 w-7" />
+                  )}
+                </button>
+
+                {micPermission === "denied" && (
+                  <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-amber-500 text-white flex items-center justify-center text-[10px] shadow-sm">
+                    <Lock className="h-3 w-3" />
+                  </span>
                 )}
-                title="Click to start dictating"
-              >
-                <Mic className="h-7 w-7" />
-              </button>
-              <span className="text-xs font-medium text-slate-600">
-                Click microphone to start recording doctor dictation
+              </div>
+
+              <span className="text-xs font-semibold text-slate-700">
+                {micPermission === "denied"
+                  ? "Microphone access blocked in browser"
+                  : isRequestingPermission
+                  ? "Requesting microphone permission..."
+                  : "Click microphone to start recording doctor dictation"}
               </span>
-              <span className="text-[10px] text-slate-400">
+              <span className="text-[10px] text-slate-400 max-w-xs">
                 Speaks Hindi, English & medical shorthand (OD, BD, TDS, SOS)
               </span>
+
+              {isRequestingPermission && (
+                <div className="p-2 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 text-[11px] animate-pulse flex items-center gap-1.5 mt-2">
+                  <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                  <span>Please click <strong>&quot;Allow&quot;</strong> in your browser&apos;s permission popup to enable recording.</span>
+                </div>
+              )}
             </div>
           )}
 
-          {micError && (
-            <p className="text-xs text-rose-600 font-medium mt-2 text-center">
-              Microphone error: {micError}
-            </p>
+          {/* =========================================================================
+              PRODUCTION PERMISSION RECOVERY & GUIDANCE CARD
+             ========================================================================= */}
+          {(showPermissionHelp || (micPermission === "denied" && !isRecording && !isProcessing)) && (
+            <div className="w-full max-w-md mt-4 p-4 rounded-xl bg-amber-50/90 border border-amber-200 text-slate-800 text-xs shadow-2xs">
+              <div className="flex items-start gap-3">
+                <div className="h-8 w-8 rounded-lg bg-amber-100 border border-amber-300 text-amber-800 flex items-center justify-center shrink-0">
+                  <Lock className="h-4 w-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="font-bold text-amber-950 text-xs">
+                      Microphone Permission Required
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowPermissionHelp(false)}
+                      className="text-amber-700 hover:text-amber-950 p-0.5 cursor-pointer"
+                      title="Dismiss notice"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-amber-900 mt-1 leading-relaxed">
+                    Your browser has microphone access currently blocked for this site. To unblock it in 5 seconds:
+                  </p>
+
+                  <ol className="mt-2 space-y-1 text-[11px] text-slate-700 list-decimal list-inside bg-white/80 p-2.5 rounded-lg border border-amber-200/60 font-medium">
+                    <li>
+                      Click the <strong className="text-slate-900">Lock (🔒) or Settings icon</strong> in your browser&apos;s address bar (left of the URL).
+                    </li>
+                    <li>
+                      Find <strong className="text-slate-900">Microphone</strong> and switch it from <em>Block</em> to <strong className="text-emerald-700">Allow</strong>.
+                    </li>
+                    <li>
+                      Click the <strong className="text-blue-700">Re-check & Test</strong> button below.
+                    </li>
+                  </ol>
+
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={startRecording}
+                      className="h-7 text-xs bg-amber-600 hover:bg-amber-700 text-white font-semibold gap-1.5 shadow-2xs cursor-pointer"
+                    >
+                      <RefreshCw className="h-3 w-3" />
+                      Re-check & Test Microphone
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setShowTextInput(true);
+                        setShowPermissionHelp(false);
+                      }}
+                      className="h-7 text-xs border-amber-300 text-amber-900 hover:bg-amber-100/60 gap-1.5 cursor-pointer"
+                    >
+                      <FileText className="h-3 w-3" />
+                      Use Text Note Fallback
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {micError && !showPermissionHelp && micPermission !== "denied" && (
+            <div className="flex items-center gap-1.5 text-xs text-rose-600 font-medium mt-2 text-center justify-center">
+              <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+              <span>Microphone error: {micError}</span>
+            </div>
           )}
         </div>
 
@@ -304,7 +516,7 @@ export function DictationWorkspace({
                 <button
                   type="button"
                   onClick={() => setTextInput("")}
-                  className="text-[11px] text-slate-400 hover:text-slate-600"
+                  className="text-[11px] text-slate-400 hover:text-slate-600 cursor-pointer"
                 >
                   Clear
                 </button>

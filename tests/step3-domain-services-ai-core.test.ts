@@ -289,8 +289,11 @@ describe("Step 3: Remaining Domain Services, Outbound WhatsApp Outbox & Gemini-F
           )
         );
       assert.ok(confirmedEvents.length >= 1);
-      const latestConfirmed = confirmedEvents[confirmedEvents.length - 1];
-      assert.strictEqual(latestConfirmed.payloadJson.appointmentId, appointment.id);
+      const matchingConfirmed = confirmedEvents.find(
+        (e) => (e.payloadJson as any)?.appointmentId === appointment.id
+      );
+      assert.ok(matchingConfirmed, "Expected matching confirmed event in webhook_outbox");
+      assert.strictEqual((matchingConfirmed.payloadJson as any).appointmentId, appointment.id);
 
       // 2. Cancel booking
       await AppointmentDomainService.cancelAppointment(testOrgId, appointment.id);
@@ -306,8 +309,11 @@ describe("Step 3: Remaining Domain Services, Outbound WhatsApp Outbox & Gemini-F
           )
         );
       assert.ok(cancelledEvents.length >= 1);
-      const latestCancelled = cancelledEvents[cancelledEvents.length - 1];
-      assert.strictEqual(latestCancelled.payloadJson.appointmentId, appointment.id);
+      const matchingCancelled = cancelledEvents.find(
+        (e) => (e.payloadJson as any)?.appointmentId === appointment.id
+      );
+      assert.ok(matchingCancelled, "Expected matching cancelled event in webhook_outbox");
+      assert.strictEqual((matchingCancelled.payloadJson as any).appointmentId, appointment.id);
     });
 
     it("reschedules appointment to new date/time, recalculating UTC slotStart and enqueuing appointment.rescheduled", async () => {

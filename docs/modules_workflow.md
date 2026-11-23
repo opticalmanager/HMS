@@ -155,6 +155,10 @@ The **Doctor AI Copilot** is a high-density, multi-tenant clinical workspace des
      - 1-click patient switching with immediate context sync across dictation and chat panels.
    - **Clinical Dictation Workspace (Center Pane - `DictationWorkspace.tsx`)**:
      - Native tactile Mic button powered by the browser `MediaRecorder` API.
+     - **Proactive Microphone Permission Lifecycle & Reactive Unlock Listener**:
+       - Proactively queries `navigator.permissions.query({ name: 'microphone' })` on mount with live `permissionStatus.onchange` listener.
+       - If blocked/denied by browser policy (where browsers suppress native dialogs), displays a high-density, dismissible **Microphone Permission Required** card with 3-step address-bar unlock instructions.
+       - Includes quick-action **Re-check & Test Microphone** and 1-click **Use Text Note Fallback** to keep doctors unblocked.
      - Real-time animated audio visualizer canvas driven by `AudioContext` and `AnalyserNode`.
      - 3-minute safety limit countdown timer with automatic graceful stop.
      - Hinglish/English sample clinical note loader for rapid development testing.
