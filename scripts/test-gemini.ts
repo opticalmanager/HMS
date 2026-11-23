@@ -73,18 +73,33 @@ async function main() {
 
   // 3. Smoke test: Multimodal Audio Extraction (Demonstrating generateStructuredFromAudio)
   console.log("\n3. Testing Multimodal Audio API Interface (generateStructuredFromAudio)...");
-  // Construct a minimal 1-second silent 16kHz mono PCM WAV header for testing API schema and payload serialization
-  const sampleWavHeader = Buffer.from([
-    0x52, 0x49, 0x46, 0x46, 0x24, 0x00, 0x00, 0x00, 0x57, 0x41, 0x56, 0x66, 0x6d, 0x74, 0x20,
-    0x10, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x80, 0x3e, 0x00, 0x00, 0x00, 0x7d, 0x00, 0x00,
-    0x02, 0x00, 0x10, 0x00, 0x64, 0x61, 0x74, 0x61, 0x00, 0x00, 0x00, 0x00
-  ]).toString("base64");
+  // Construct a valid 1-second silent 16kHz 16-bit mono PCM WAV for testing audio ingestion
+  function createSilentWav(durationSeconds = 1, sampleRate = 16000): Buffer {
+    const numSamples = durationSeconds * sampleRate;
+    const dataSize = numSamples * 2;
+    const buf = Buffer.alloc(44 + dataSize);
+    buf.write("RIFF", 0);
+    buf.writeUInt32LE(36 + dataSize, 4);
+    buf.write("WAVE", 8);
+    buf.write("fmt ", 12);
+    buf.writeUInt32LE(16, 16);
+    buf.writeUInt16LE(1, 20); // PCM
+    buf.writeUInt16LE(1, 22); // Mono
+    buf.writeUInt32LE(sampleRate, 24);
+    buf.writeUInt32LE(sampleRate * 2, 28);
+    buf.writeUInt16LE(2, 32);
+    buf.writeUInt16LE(16, 34);
+    buf.write("data", 36);
+    buf.writeUInt32LE(dataSize, 40);
+    return buf;
+  }
+  const sampleWavBase64 = createSilentWav(1).toString("base64");
 
   try {
     const audioRes = await provider.generateStructuredFromAudio(
       {
         model: reasoningModel,
-        audioBase64: sampleWavHeader,
+        audioBase64: sampleWavBase64,
         mimeType: "audio/wav",
         systemPrompt: DOCTOR_DICTATION_PROMPT_V1,
         userPrompt: "Extract consultation dictation if present or report empty/clean structure.",

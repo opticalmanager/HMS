@@ -396,10 +396,12 @@ export class LlmClient {
         }
       } catch (err: any) {
         if (
-          err instanceof AiRateLimitError ||
-          err?.status === 500 ||
-          err?.status === 503 ||
-          err?.code === "AI_RATE_LIMIT_EXCEEDED"
+          (err instanceof AiRateLimitError ||
+            err?.status === 429 ||
+            err?.status === 500 ||
+            err?.status === 503 ||
+            err?.code === "AI_RATE_LIMIT_EXCEEDED") &&
+          fullOutput.length === 0
         ) {
           fallbackUsed = true;
           const stream = this.provider.streamText({

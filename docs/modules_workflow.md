@@ -142,30 +142,72 @@ Hospital administrators, accountants, and clinical heads access 16 operational r
 
 ## 3. AI-Assisted Clinical Dictation & Transactional Outbox Workflows
 
-### 1. Doctor Voice Dictation & Human-in-the-Loop (HITL) Prescription Flow
-1. **Multimodal Audio / Transcript Ingestion**:
-   - Doctor records consultation notes or dictates visit summary in natural English or conversational Hinglish.
-   - Multimodal native audio or transcribed text is processed by `LlmClient` using the reasoning tier (`gemini-2.5-flash`).
-2. **Deterministic Formulary & Pricing Grounding**:
-   - Structured JSON output conforms strictly to `VisitExtractionSchema` (`lib/validations/clinical-ai.ts`).
-   - Every parsed medication name is deterministically grounded against clinic's `medicine_master` formulary using `pg_trgm` fuzzy matching.
-   - Low-confidence matches (score < 0.45), low LLM extraction confidence (< 0.75), or missing dosage/duration are automatically flagged with `needsReview: true`.
-3. **Mandatory Human-in-the-Loop (DRAFT Status)**:
-   - Prescriptions are strictly created with `status: "DRAFT"`. AI is strictly forbidden from directly approving or issuing prescriptions.
-   - Attending doctor or authorized clinician reviews the draft in the OPD workspace, corrects any flagged low-confidence medications, and clicks **Approve Prescription**.
-4. **Approval & Immutability**:
-   - Calling `/api/crm/prescriptions/[id]/approve` records `approvedByUserId` + timestamp and transitions status to `APPROVED`.
-   - Any subsequent attempt to edit an `APPROVED` prescription is blocked with HTTP 409 `ALREADY_APPROVED`.
+### 1. Dedicated Doctor AI Copilot Workspace (`/dashboard/copilot`)
+The **Doctor AI Copilot** is a high-density, multi-tenant clinical workspace designed to eliminate clinical charting fatigue while maintaining uncompromising patient safety and deterministic billing:
 
-### 2. Tariff-Grounded Draft Billing
-1. **Tariff Price Enforcement**:
-   - Billable services extracted from dictation are grounded against clinic `service_tariffs` master using `fuzzyMatchTariffs`.
-   - Unit prices and tax rates are always fetched from official PostgreSQL records—never accepted from LLM-generated amounts unless explicitly flagged as `DOCTOR_OVERRIDE` with `needsReview: true`.
-2. **Draft → Issued Lifecycle**:
-   - Draft invoices are saved with `status: "DRAFT"`.
-   - Staff finalizes charges and calls `/api/crm/invoices/[id]/issue` to generate official invoice sequence and lock record.
+1. **3-Pane Docked Architecture (`isDockedWorkspace: true`)**:
+   - **Context Rail (Left Pane - `ContextRail.tsx`)**:
+     - Live, searchable OPD queue with status badges (`Waiting`, `In Consultation`, `Completed`).
+     - Doctor selector with auto-selection of the authenticated doctor's profile.
+     - Selected patient profile card displaying age, gender, UHID, and a prominent **Red Allergy Alert Pill** if confirmed allergies are on file.
+     - 1-click patient switching with immediate context sync across dictation and chat panels.
+   - **Clinical Dictation Workspace (Center Pane - `DictationWorkspace.tsx`)**:
+     - Native tactile Mic button powered by the browser `MediaRecorder` API.
+     - Real-time animated audio visualizer canvas driven by `AudioContext` and `AnalyserNode`.
+     - 3-minute safety limit countdown timer with automatic graceful stop.
+     - Hinglish/English sample clinical note loader for rapid development testing.
+     - Side-by-side editable **Draft Prescription Card** (`DraftPrescriptionCard.tsx`) and **Draft Invoice Card** (`DraftInvoiceCard.tsx`).
+     - Interactive `RxPrintModal.tsx` for clean A4 letterhead printing before or after sign-off.
+     - **Sticky Action Bar** with role-aware buttons: Save Draft, Print/Preview Rx, and Finalize/Approve.
+   - **Assistant Chat Rail (Right Pane - `CopilotChatWorkspace.tsx`)**:
+     - Context-aware streaming assistant pre-loaded with today's OPD appointments, doctor schedule, and active patient profile.
+     - Streams typed NDJSON events (`status`, `token`, `action_card`, `done`) with live token generation.
+     - Starter prompt chips (`Block my next 2 hours`, `Book follow-up next week`, `Show available slots tomorrow`).
+     - Interactive, non-destructive Action Cards for slot blocking (`BLOCK_SLOT_CARD`) and follow-up booking (`BOOK_FOLLOWUP_CARD`).
 
-### 3. Transactional Outbox & WhatsApp Dispatch Architecture
+2. **Multimodal Audio / Transcript Ingestion Pipeline**:
+   - Audio is transmitted as `multipart/form-data` (validated <= 10MB) to `/api/crm/copilot/dictate` or raw text via JSON.
+   - Processed by `DictationOrchestrator` using the dual-tier LLM engine (`gemini-3.5-flash` / `gemini-3.5-flash-lite`).
+   - Structured JSON output conforms strictly to `DoctorDictationExtractionSchema` (`modules/ai/prompts/copilot-dictation.ts`).
+
+3. **Deterministic Salt-Level Allergy Safety Cross-Check**:
+   - Cross-checks prescribed medications against the patient's recorded allergies across 3 clinical levels:
+     1. `spokenName` extracted by the model.
+     2. `brandName` matched in the clinic's catalog.
+     3. `genericName` (active pharmaceutical ingredient/salt) from `medicine_master`.
+   - Utilizes standardized allergen group synonym mappings (e.g., `penicillin` matches `amoxicillin`, `ampicillin`; `nsaid` matches `aspirin`, `ibuprofen`, `diclofenac`).
+   - When a match is detected, the draft prescription displays an unmistakable blocking red warning banner specifying the matched salt and allergen.
+
+4. **Deterministic Catalog Grounding & HITL Prescription Safeguards**:
+   - Parsed medications are grounded deterministically against `medicine_master` via `pg_trgm` fuzzy matching.
+   - Low-confidence matches (<0.45 similarity) or uncataloged medications are visibly marked with yellow `needsReview` badges and remain fully editable.
+   - Prescriptions are strictly created in `status: "DRAFT"`. AI can never directly approve, sign, or finalize a medical record.
+   - Attending doctor reviews, edits fields inline, and clicks **Approve & Send to Desk** or **Approve & Finalize**.
+
+5. **Deterministic Tariff Grounding & Role-Aware Invoice Approval**:
+   - Billable services extracted from dictation are grounded against clinic `service_tariffs` via `fuzzyMatchTariffs`.
+   - Official catalog prices and tax rates are always fetched from PostgreSQL; doctor custom amounts are explicitly labeled with `DOCTOR_OVERRIDE` badges.
+   - If the clinician did not state a consultation fee, `DictationOrchestrator` automatically queries clinic tariffs for `"General Consultation"` or `"Consultation"` and adds it as a suggested line item.
+   - **Role-Aware Approval Logic (`POST /api/crm/copilot/approve`)**:
+     - When signed by a user with role `doctor`: prescription is approved (`APPROVED`), immutable approval lock is placed, outbox notification is queued, while the invoice is retained as `DRAFT` in the database and marked `invoiceStatus: "DRAFT_READY_FOR_DESK"` for front-desk collection.
+     - When signed by a user with `billing:issue` authority (e.g. Owner or Admin) and `issueInvoiceNow: true`: the prescription is approved and the invoice is atomically finalized to `ISSUED`.
+
+6. **Context-Aware Streaming Chat & Bounded Tool Loops**:
+   - `ChatOrchestrator` executes up to 5 tool iterations filtered strictly by the user's RBAC role:
+     - `get_today_queue`
+     - `search_patients`
+     - `get_available_slots`
+     - `search_catalog`
+     - `prepare_followup_booking`
+     - `preview_block_doctor_slot`
+   - **Mandatory 2-Step Safe Slot Blocking**:
+     - `preview_block_doctor_slot` always executes `dryRun: true` conflict detection against `appointments`.
+     - Displays an interactive `BLOCK_SLOT_CARD` in the chat thread showing affected patients.
+     - Clicking **Confirm Slot Block** calls `POST /api/crm/copilot/actions/confirm` with `actionType: "CONFIRM_BLOCK_SLOT"`, executing `dryRun: false`, persisting the block in `doctor_slot_blocks`, and enqueuing patient reschedule notifications into `webhook_outbox`.
+
+---
+
+### 2. Transactional Outbox & WhatsApp Dispatch Architecture
 1. **Zero Booking Coupling**:
    - All booking confirmations, cancellations, reschedules, prescription approvals, and invoice issuances enqueue an event into `webhook_outbox` inside the **same database transaction**.
    - Outage or latency in third-party WhatsApp providers (e.g. Broadcast Manager) never rolls back or fails appointment booking commits.

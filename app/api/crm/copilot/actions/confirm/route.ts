@@ -1,5 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
+import { eq, and } from "drizzle-orm";
+import { db } from "@/lib/drizzle";
+import { doctors } from "@/db/schema/doctors";
 import { requireClinicSession, handleAuthError, ForbiddenError } from "@/lib/auth-guard";
 import { ScheduleService } from "@/services/domain/schedule-service";
 import { AppointmentDomainService } from "@/services/domain/appointment-service";
@@ -56,6 +59,23 @@ export async function POST(request: NextRequest) {
       // Role check: Only owner, admin, or doctor can block slots
       if (role !== "owner" && role !== "admin" && role !== "doctor") {
         throw new ForbiddenError("Insufficient permission to block doctor slots.");
+      }
+
+      if (role === "doctor") {
+        const [doctorProfile] = await db
+          .select({ id: doctors.id, userId: doctors.userId })
+          .from(doctors)
+          .where(
+            and(
+              eq(doctors.organizationId, clinicId),
+              eq(doctors.id, parsed.data.doctorId)
+            )
+          )
+          .limit(1);
+
+        if (!doctorProfile || doctorProfile.userId !== user.id) {
+          throw new ForbiddenError("Doctor ownership mismatch: You can only block slots for your own doctor profile.");
+        }
       }
 
       // Step 2 of 2-Step Destructive Action: dryRun = false

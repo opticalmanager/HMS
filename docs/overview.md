@@ -55,7 +55,7 @@ The architecture strictly enforces multi-tenancy (`1 Organization = 1 Clinic`) v
    - `billing-service.ts`: Official service tariff enforcement (AI cannot hallucinate prices), deterministic GST calculation, and invoice state transitions (`DRAFT` → `ISSUED`).
    - `notification-service.ts`: Transactional outbox engine with 2-phase worker claim (`FOR UPDATE SKIP LOCKED`), HMAC-SHA256 request signing, and exponential backoff retry scheduling.
 2. **Gemini-First, Provider-Agnostic AI Core (`modules/ai/`)**:
-   - Google GenAI SDK integration (`@google/genai`) with dual-tier task routing: `TIER_FAST` (`gemini-2.5-flash-lite`) and `TIER_REASONING` (`gemini-2.5-flash`) with automatic rate-limit fallback.
+   - Google GenAI SDK integration (`@google/genai`) with dual-tier task routing: `TIER_FAST` (`gemini-3.5-flash-lite`) and `TIER_REASONING` (`gemini-3.5-flash`) with automatic rate-limit and transient error fallback.
    - Multimodal native audio dictation support (up to 10MB payload size guard).
    - Inbound security guardrails preventing prompt injection and exfiltration attacks, accompanied by PII log redaction (`redactPiiForLogs`).
    - Outbound clinical safety guardrail detecting emergency red flags (chest pain, acute dyspnea) on patient-facing channels (`WHATSAPP`, `VOICE_DOGRAH`).
@@ -63,7 +63,32 @@ The architecture strictly enforces multi-tenancy (`1 Organization = 1 Clinic`) v
 
 ---
 
-## 5. The 12 Monolithic Modules
+## 5. Dedicated Doctor AI Copilot Workspace (Step 4 Completed)
+
+1. **Dedicated Clinical Cockpit (`/dashboard/copilot`)**:
+   - Docked 3-pane layout (`isDockedWorkspace: true` in AppShell layout):
+     - **Left Context Rail**: Searchable live OPD queue with status chips, clinician selector with automatic logged-in doctor profile linking, and selected patient clinical snapshot featuring an immediate red alert badge for confirmed allergies.
+     - **Center Clinical Dictation Workspace**: High-density tactile voice recorder with animated Web Audio API waveform canvas, 3-minute safety limit countdown, Hinglish sample loader, and simultaneous side-by-side DRAFT Prescription and DRAFT Invoice review cards.
+     - **Right Assistant Chat Rail**: Context-aware clinical chat assistant pre-loaded with OPD queue and selected patient context, streaming NDJSON tokens, tool progress indicators, and interactive action cards.
+2. **Native Voice & Multimodal Extraction Pipeline**:
+   - Multimodal Gemini audio transcription and structured extraction (`generateStructuredFromAudio`) or text dictation (`generateStructured`).
+   - Structured JSON schema enforcing symptoms, diagnoses (ICD-10 codes), medicines, investigations, advice, and billing services.
+3. **Deterministic Salt-Level Allergy Safety Cross-Check**:
+   - Cross-checks prescribed medications against patient allergy history across 3 levels: spoken drug name, catalog brand name, and pharmacological active ingredient (`generic_name`).
+   - Standardized synonym matching groups (e.g., `penicillin` ↔ `amoxicillin`, `sulfa` ↔ `sulfamethoxazole`, `nsaid` ↔ `aspirin`/`ibuprofen`/`diclofenac`).
+   - Lowers safety severity into blocking red banners on draft cards when a lethal allergen is detected.
+4. **Deterministic Catalog Grounding & HITL Safeguards**:
+   - Fuzzy matches medicines against clinic `medicine_master` via `pg_trgm` (`PrescriptionDomainService.createDraftPrescription`).
+   - Fuzzy matches services against clinic `service_tariffs` (`BillingDomainService.createDraftInvoice`).
+   - Automatically detects and appends an official consultation tariff if the clinician did not state one explicitly.
+   - Strictly enforces Human-In-The-Loop: LLMs create ONLY `DRAFT` prescriptions and `DRAFT` invoices. Final approval requires explicit doctor confirmation.
+5. **Role-Aware Approval & Bounded Tool Loops**:
+   - Approvals enforce RBAC: a `doctor` user approves the prescription (locks Rx and queues `prescription.approved`), keeping the invoice in `DRAFT_READY_FOR_DESK` for front desk settlement; users with `billing:issue` can issue invoices immediately.
+   - Chat assistant runs bounded tool loops (max 5 iterations) strictly scoped by RBAC role. High-impact operations (e.g. `block_doctor_slot`) always run first as `dryRun: true` conflict checks and require manual card confirmation before execution.
+
+---
+
+## 6. The 12 Monolithic Modules
 
 | # | Module | Operational Focus | Key Features |
 |---|---|---|---|
@@ -82,7 +107,7 @@ The architecture strictly enforces multi-tenancy (`1 Organization = 1 Clinic`) v
 
 ---
 
-## 5. High-Density Clinical Philosophy
+## 7. High-Density Clinical Philosophy
 
 Clinical environments differ fundamentally from consumer web apps. Doctors, triage nurses, and hospital receptionists operate under severe time constraints where latency, excessive modal clicks, and mouse reliance cause dangerous bottlenecks.
 
