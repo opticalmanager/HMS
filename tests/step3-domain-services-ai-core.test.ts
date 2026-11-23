@@ -793,7 +793,7 @@ describe("Step 3: Remaining Domain Services, Outbound WhatsApp Outbox & Gemini-F
       }) as typeof fetch;
 
       const dispatchResult = await NotificationDomainService.dispatchPendingOutboxEvents({
-        batchSize: 20,
+        batchSize: 100,
         fetchFn: mockFetch200,
       });
 

@@ -32,6 +32,7 @@ interface AppointmentQueueDrawerProps {
   collapsed: boolean;
   onToggleCollapse: () => void;
   onOpenBooking: () => void;
+  onStatusTransition?: (aptId: string, newStatus: AppointmentStatus) => void;
 }
 
 export function AppointmentQueueDrawer({
@@ -41,6 +42,7 @@ export function AppointmentQueueDrawer({
   collapsed,
   onToggleCollapse,
   onOpenBooking,
+  onStatusTransition,
 }: AppointmentQueueDrawerProps) {
   const [activeTab, setActiveTab] = React.useState<"appointments" | "followups">("appointments");
   const [search, setSearch] = React.useState("");
@@ -93,8 +95,20 @@ export function AppointmentQueueDrawer({
     });
   }, [dateAppointments, activeStatusFilter, priorityFilter, search]);
 
-  const handleStatusChange = (aptId: string, newStatus: AppointmentStatus) => {
+  const handleStatusChange = async (aptId: string, newStatus: AppointmentStatus) => {
     clinicalStore.updateAppointmentStatus(aptId, newStatus);
+    if (onStatusTransition) {
+      onStatusTransition(aptId, newStatus);
+    }
+    try {
+      await fetch(`/api/crm/appointments/${aptId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+    } catch (e) {
+      console.error("Failed to patch appointment status in DB:", e);
+    }
   };
 
   if (collapsed) {

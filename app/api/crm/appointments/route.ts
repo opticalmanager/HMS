@@ -36,7 +36,9 @@ export async function GET(request: NextRequest) {
     const patientId = searchParams.get("patientId") || undefined;
     const status = searchParams.get("status") || undefined;
     const appointmentDate = searchParams.get("date") || undefined;
-    const limit = searchParams.get("limit") ? parseInt(searchParams.get("limit")!, 10) : 50;
+    const startDate = searchParams.get("startDate") || undefined;
+    const endDate = searchParams.get("endDate") || undefined;
+    const limit = searchParams.get("limit") ? parseInt(searchParams.get("limit")!, 10) : 100;
 
     // Strict tenant isolation: Single Domain Service Layer
     const data = await AppointmentDomainService.listAppointments(clinicId, {
@@ -44,6 +46,8 @@ export async function GET(request: NextRequest) {
       patientId,
       status,
       appointmentDate,
+      startDate,
+      endDate,
       limit,
     });
 

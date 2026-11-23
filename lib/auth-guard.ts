@@ -160,6 +160,13 @@ export async function requireClinicSession(
   let role: ClinicRole | undefined = options?.role;
   let memberId = options?.memberId || `mem-${session.user.id}`;
 
+  if (!clinicId && options?.session) {
+    if (shouldRedirect) {
+      redirect("/onboarding");
+    }
+    throw new NoActiveClinicError();
+  }
+
   if (!role) {
     const { member } = await import("@/db/schema/auth");
     const { db } = await import("@/lib/drizzle");

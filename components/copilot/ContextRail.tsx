@@ -139,11 +139,17 @@ export function ContextRail({
             {doctors.length === 0 ? (
               <option value="">No Active Doctors in Clinic</option>
             ) : (
-              doctors.map((doc) => (
-                <option key={doc.id} value={doc.id}>
-                  Dr. {doc.fullName} ({doc.specialty})
-                </option>
-              ))
+              <>
+                <option value="all">All Doctors (Full Clinic Queue)</option>
+                {doctors.map((doc) => {
+                  const docLabel = doc.fullName.startsWith("Dr.") ? doc.fullName : `Dr. ${doc.fullName}`;
+                  return (
+                    <option key={doc.id} value={doc.id}>
+                      {docLabel} ({doc.specialty || "General"})
+                    </option>
+                  );
+                })}
+              </>
             )}
           </select>
           <Stethoscope className="h-4 w-4 text-[#2563EB] absolute left-2.5 top-2 pointer-events-none" />

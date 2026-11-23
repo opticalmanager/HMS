@@ -1,10 +1,23 @@
 import "server-only";
-import { eq, and, or, desc, lt, gt, sql, inArray } from "drizzle-orm";
+import { eq, and, or, desc, lt, gt, lte, gte, sql, inArray } from "drizzle-orm";
 import { db } from "@/lib/drizzle";
 import { appointments, type AppointmentEntity, type NewAppointmentEntity } from "@/db/schema/appointments";
+import { patients } from "@/db/schema/patients";
+import { doctors } from "@/db/schema/doctors";
 import { doctorSchedules, doctorSlotBlocks } from "@/db/schema/schedules";
 import { clinicProfiles } from "@/db/schema/clinic-profiles";
 import { enqueueWebhookEvent } from "./notification-service";
+
+export interface AppointmentWithDetails extends AppointmentEntity {
+  patientName?: string | null;
+  patientPhone?: string | null;
+  patientUhid?: string | null;
+  patientGender?: string | null;
+  patientAge?: number | null;
+  patientAllergies?: string[] | string | null;
+  doctorName?: string | null;
+  doctorSpecialty?: string | null;
+}
 
 export interface AvailableSlot {
   slotStart: string; // ISO 8601 UTC
@@ -76,9 +89,30 @@ export interface UpdateAppointmentInput {
 // Timezone and Slot Calculation Helpers
 // -------------------------------------------------------------
 
+/**
+ * Robust parser for both 24-hour ("16:30", "09:00") and 12-hour AM/PM ("04:30 PM", "10:00 AM", "4:30 pm") time strings.
+ */
+export function parseTimeString(timeStr: string): { hour: number; minute: number } {
+  if (!timeStr || typeof timeStr !== "string") {
+    return { hour: 9, minute: 0 };
+  }
+  const clean = timeStr.trim().toUpperCase();
+  const isPm = clean.includes("PM");
+  const isAm = clean.includes("AM");
+  const timeOnly = clean.replace(/[^\d:]/g, "");
+  const [hStr, mStr] = timeOnly.split(":");
+  let hour = parseInt(hStr, 10);
+  let minute = parseInt(mStr, 10);
+  if (isNaN(hour)) hour = 9;
+  if (isNaN(minute)) minute = 0;
+  if (isPm && hour < 12) hour += 12;
+  if (isAm && hour === 12) hour = 0;
+  return { hour, minute };
+}
+
 export function localToUtc(dateStr: string, timeStr: string, timeZone: string): Date {
   const [y, m, d] = dateStr.split("-").map(Number);
-  const [hh, mm] = timeStr.split(":").map(Number);
+  const { hour: hh, minute: mm } = parseTimeString(timeStr);
   const naiveUtc = new Date(Date.UTC(y, m - 1, d, hh, mm, 0));
   const formatter = new Intl.DateTimeFormat("en-US", {
     timeZone,
@@ -121,8 +155,8 @@ export function getDayOfWeekInTimezone(dateStr: string, timeZone: string): numbe
 }
 
 function parseMinutes(timeStr: string): number {
-  const [h, m] = timeStr.split(":").map(Number);
-  return h * 60 + m;
+  const { hour, minute } = parseTimeString(timeStr);
+  return hour * 60 + minute;
 }
 
 function formatMinutes(totalMins: number): string {
@@ -133,7 +167,7 @@ function formatMinutes(totalMins: number): string {
 
 export class AppointmentDomainService {
   /**
-   * Lists appointments strictly scoped by clinic organization.
+   * Lists appointments strictly scoped by clinic organization with patient and doctor details.
    */
   static async listAppointments(
     clinicId: string,
@@ -143,11 +177,13 @@ export class AppointmentDomainService {
       patientId?: string;
       status?: string;
       appointmentDate?: string;
+      startDate?: string;
+      endDate?: string;
     } = {}
-  ): Promise<AppointmentEntity[]> {
+  ): Promise<AppointmentWithDetails[]> {
     const conditions = [eq(appointments.organizationId, clinicId)];
 
-    if (options.doctorId) {
+    if (options.doctorId && options.doctorId !== "all") {
       conditions.push(eq(appointments.doctorId, options.doctorId));
     }
     if (options.patientId) {
@@ -159,31 +195,84 @@ export class AppointmentDomainService {
     if (options.appointmentDate) {
       conditions.push(eq(appointments.appointmentDate, options.appointmentDate));
     }
+    if (options.startDate) {
+      conditions.push(gte(appointments.appointmentDate, options.startDate));
+    }
+    if (options.endDate) {
+      conditions.push(lte(appointments.appointmentDate, options.endDate));
+    }
 
-    const limit = Math.max(1, Math.min(100, options.limit || 50));
+    const limit = Math.max(1, Math.min(200, options.limit || 100));
 
-    return db
-      .select()
+    const rows = await db
+      .select({
+        appointment: appointments,
+        patientName: patients.fullName,
+        patientPhone: patients.phone,
+        patientUhid: patients.uhid,
+        patientGender: patients.gender,
+        patientAge: patients.age,
+        patientAllergies: patients.allergies,
+        doctorName: doctors.fullName,
+        doctorSpecialty: doctors.specialty,
+      })
       .from(appointments)
+      .leftJoin(patients, eq(appointments.patientId, patients.id))
+      .leftJoin(doctors, eq(appointments.doctorId, doctors.id))
       .where(and(...conditions))
-      .orderBy(desc(appointments.createdAt))
+      .orderBy(appointments.tokenNumber, desc(appointments.createdAt))
       .limit(limit);
+
+    return rows.map((r) => ({
+      ...r.appointment,
+      patientName: r.patientName,
+      patientPhone: r.patientPhone,
+      patientUhid: r.patientUhid,
+      patientGender: r.patientGender,
+      patientAge: r.patientAge,
+      patientAllergies: r.patientAllergies,
+      doctorName: r.doctorName,
+      doctorSpecialty: r.doctorSpecialty,
+    }));
   }
 
   /**
-   * Retrieves a single appointment by ID with strict tenant isolation.
+   * Retrieves a single appointment by ID with strict tenant isolation and populated details.
    */
   static async getAppointmentById(
     clinicId: string,
     appointmentId: string
-  ): Promise<AppointmentEntity | null> {
-    const [appointment] = await db
-      .select()
+  ): Promise<AppointmentWithDetails | null> {
+    const [row] = await db
+      .select({
+        appointment: appointments,
+        patientName: patients.fullName,
+        patientPhone: patients.phone,
+        patientUhid: patients.uhid,
+        patientGender: patients.gender,
+        patientAge: patients.age,
+        patientAllergies: patients.allergies,
+        doctorName: doctors.fullName,
+        doctorSpecialty: doctors.specialty,
+      })
       .from(appointments)
+      .leftJoin(patients, eq(appointments.patientId, patients.id))
+      .leftJoin(doctors, eq(appointments.doctorId, doctors.id))
       .where(and(eq(appointments.organizationId, clinicId), eq(appointments.id, appointmentId)))
       .limit(1);
 
-    return appointment || null;
+    if (!row) return null;
+    return {
+      ...row.appointment,
+      patientName: row.patientName,
+      patientPhone: row.patientPhone,
+      patientUhid: row.patientUhid,
+      patientGender: row.patientGender,
+      patientAge: row.patientAge,
+      patientAllergies: row.patientAllergies,
+      doctorName: row.doctorName,
+      doctorSpecialty: row.doctorSpecialty,
+    };
   }
 
   /**
@@ -236,8 +325,36 @@ export class AppointmentDomainService {
       )
       .orderBy(doctorSchedules.startTime);
 
-    if (schedules.length === 0) {
-      return [];
+    let scheduleList = schedules;
+    if (scheduleList.length === 0) {
+      // Default standard clinic OPD shifts if doctor has no custom weekly schedule configured:
+      // Morning shift: 09:30 - 13:00 (30 min slots), Evening shift: 16:00 - 20:00 (30 min slots)
+      scheduleList = [
+        {
+          id: "default-morn",
+          organizationId,
+          doctorId,
+          dayOfWeek,
+          startTime: "09:30",
+          endTime: "13:00",
+          slotDurationMins: 30,
+          isActive: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: "default-eve",
+          organizationId,
+          doctorId,
+          dayOfWeek,
+          startTime: "16:00",
+          endTime: "20:00",
+          slotDurationMins: 30,
+          isActive: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ] as any;
     }
 
     // Compute start and end of the full day in UTC to query blocks & active bookings
@@ -285,7 +402,7 @@ export class AppointmentDomainService {
     const availableSlots: AvailableSlot[] = [];
     const nowMs = Date.now();
 
-    for (const sched of schedules) {
+    for (const sched of scheduleList) {
       const slotDuration = sched.slotDurationMins || 15;
       const startMins = parseMinutes(sched.startTime);
       const endMins = parseMinutes(sched.endTime);

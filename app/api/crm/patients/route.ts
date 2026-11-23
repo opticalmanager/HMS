@@ -114,36 +114,96 @@ export async function POST(request: NextRequest) {
     const phoneE164 = phone.startsWith("+") ? phone : `+91${cleanPhone}`;
     const uhid = parsed.data.uhid || `UHID-${Date.now().toString().slice(-6)}`;
 
-    // Strict tenant isolation: organizationId ALWAYS comes from requireClinicSession
-    const [newPatient] = await db
-      .insert(patients)
-      .values({
-        organizationId: clinicId,
-        uhid,
-        fullName,
-        gender,
-        phone: cleanPhone,
-        phoneE164,
-        dateOfBirth: dateOfBirth || null,
-        age: age || null,
-        email: email || null,
-        address: address || null,
-        city: city || null,
-        pincode: pincode || null,
-        bloodGroup: bloodGroup || null,
-        emergencyContactName: emergencyContactName || null,
-        emergencyContactPhone: emergencyContactPhone || null,
-        emergencyContactRelation: emergencyContactRelation || null,
-        abhaId: abhaId || null,
-        allergies: allergies || [],
-        chronicConditions: chronicConditions || [],
-      })
-      .returning();
+    // Strict tenant isolation: check if patient already exists in this clinic by phone
+    const [existingPatient] = await db
+      .select()
+      .from(patients)
+      .where(
+        and(
+          eq(patients.organizationId, clinicId),
+          or(
+            eq(patients.phoneE164, phoneE164),
+            eq(patients.phone, cleanPhone)
+          )
+        )
+      )
+      .limit(1);
 
-    return NextResponse.json(
-      { success: true, patient: newPatient },
-      { status: 201 }
-    );
+    if (existingPatient) {
+      // If patient exists and fullName was updated, sync it
+      if (fullName && fullName.trim() !== existingPatient.fullName) {
+        const [updated] = await db
+          .update(patients)
+          .set({
+            fullName: fullName.trim(),
+            updatedAt: new Date(),
+          })
+          .where(and(eq(patients.organizationId, clinicId), eq(patients.id, existingPatient.id)))
+          .returning();
+        return NextResponse.json(
+          { success: true, patient: updated, isExisting: true },
+          { status: 200 }
+        );
+      }
+      return NextResponse.json(
+        { success: true, patient: existingPatient, isExisting: true },
+        { status: 200 }
+      );
+    }
+
+    try {
+      // Strict tenant isolation: organizationId ALWAYS comes from requireClinicSession
+      const [newPatient] = await db
+        .insert(patients)
+        .values({
+          organizationId: clinicId,
+          uhid,
+          fullName,
+          gender,
+          phone: cleanPhone,
+          phoneE164,
+          dateOfBirth: dateOfBirth || null,
+          age: age || null,
+          email: email || null,
+          address: address || null,
+          city: city || null,
+          pincode: pincode || null,
+          bloodGroup: bloodGroup || null,
+          emergencyContactName: emergencyContactName || null,
+          emergencyContactPhone: emergencyContactPhone || null,
+          emergencyContactRelation: emergencyContactRelation || null,
+          abhaId: abhaId || null,
+          allergies: allergies || [],
+          chronicConditions: chronicConditions || [],
+        })
+        .returning();
+
+      return NextResponse.json(
+        { success: true, patient: newPatient },
+        { status: 201 }
+      );
+    } catch (insertErr: any) {
+      if (insertErr?.code === "23505" || insertErr?.message?.includes("unique")) {
+        const [conflictPatient] = await db
+          .select()
+          .from(patients)
+          .where(
+            and(
+              eq(patients.organizationId, clinicId),
+              or(eq(patients.phoneE164, phoneE164), eq(patients.phone, cleanPhone))
+            )
+          )
+          .limit(1);
+
+        if (conflictPatient) {
+          return NextResponse.json(
+            { success: true, patient: conflictPatient, isExisting: true },
+            { status: 200 }
+          );
+        }
+      }
+      throw insertErr;
+    }
   } catch (error) {
     return handleAuthError(error);
   }

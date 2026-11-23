@@ -28,19 +28,85 @@ export function QuickPatientDirectoryModal({
 }: QuickPatientDirectoryModalProps) {
   const store = useClinicalStore();
   const [search, setSearch] = React.useState("");
+  const [dbPatients, setDbPatients] = React.useState<Patient[]>([]);
+  const [isLoading, setIsLoading] = React.useState(false);
+
+  // Fetch real patients from PostgreSQL directory
+  React.useEffect(() => {
+    if (!open) return;
+    let isCurrent = true;
+    setIsLoading(true);
+
+    const timer = setTimeout(() => {
+      const q = search.trim();
+      const url = q.length >= 2
+        ? `/api/crm/patients?query=${encodeURIComponent(q)}&limit=50`
+        : `/api/crm/patients?limit=50`;
+
+      fetch(url)
+        .then((res) => res.json())
+        .then((data) => {
+          if (!isCurrent) return;
+          if (data.success && Array.isArray(data.patients)) {
+            setDbPatients(
+              data.patients.map((p: any) => ({
+                id: p.id,
+                organizationId: p.organizationId,
+                branchId: p.branchId || "br-main-001",
+                uhid: p.uhid,
+                fullName: p.fullName,
+                gender: p.gender,
+                age: p.age ?? undefined,
+                dateOfBirth: p.dateOfBirth ?? undefined,
+                phone: p.phone,
+                email: p.email ?? undefined,
+                address: p.address ?? undefined,
+                city: p.city ?? undefined,
+                pincode: p.pincode ?? undefined,
+                bloodGroup: p.bloodGroup ?? undefined,
+                abhaId: p.abhaId ?? undefined,
+                allergies: Array.isArray(p.allergies) ? p.allergies : [],
+                chronicConditions: Array.isArray(p.chronicConditions) ? p.chronicConditions : [],
+                registeredAt: p.createdAt || new Date().toISOString(),
+              }))
+            );
+          }
+        })
+        .catch(() => {})
+        .finally(() => {
+          if (isCurrent) setIsLoading(false);
+        });
+    }, 200);
+
+    return () => {
+      isCurrent = false;
+      clearTimeout(timer);
+    };
+  }, [open, search]);
 
   const filteredPatients = React.useMemo(() => {
-    if (!search.trim()) return store.patients;
+    // If DB results exist, prioritize them, merging unique by id or phone
+    const seen = new Set<string>();
+    const combined: Patient[] = [];
+
+    for (const p of dbPatients) {
+      seen.add(p.id);
+      seen.add(p.phone);
+      combined.push(p);
+    }
+
+    // Also include any in-memory store patients not yet in DB
     const q = search.toLowerCase();
-    return store.patients.filter(
-      (p) =>
-        p.fullName.toLowerCase().includes(q) ||
-        p.phone.includes(q) ||
-        p.uhid.toLowerCase().includes(q) ||
-        p.abhaId?.includes(q) ||
-        p.city?.toLowerCase().includes(q)
-    );
-  }, [search, store.patients]);
+    for (const p of store.patients) {
+      if (!seen.has(p.id) && !seen.has(p.phone)) {
+        if (!q || p.fullName.toLowerCase().includes(q) || p.phone.includes(q) || p.uhid.toLowerCase().includes(q)) {
+          combined.push(p);
+        }
+      }
+    }
+
+    return combined;
+  }, [dbPatients, store.patients, search]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

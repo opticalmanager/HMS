@@ -72,11 +72,13 @@ The hospital monolith coordinates patient care through a seamless multi-departme
 ## 2. Detailed Clinical & Financial Procedures
 
 ### Step 1: Reception & Token Issuance
-1. Reception staff enters patient mobile number or scans ABHA QR code.
-2. If patient exists, demographics auto-populate via autocomplete; otherwise, a unique `UHID-YYYY-XXXXXX` is generated.
-3. Patient selects visiting department and doctor from the multi-doctor slot engine.
-4. Fast-track Walk-in Token generator issues instant token slip (`TKN-XXX`) and announces the token on the full-screen reception TV board (`/token-board`) with Web Audio API chime.
-5. An automated WhatsApp appointment confirmation is dispatched.
+1. Reception staff enters patient mobile number, searches registered UHID/name, or scans ABHA QR code.
+2. If patient already exists in the clinic database (matching 10-digit mobile or `phoneE164`), demographics auto-populate seamlessly without duplicate key errors; otherwise, a unique `UHID-YYYY-XXXXXX` is generated.
+3. Patient selects visiting department and doctor from the multi-doctor roster (with deduplicated `Dr.` titles).
+4. System queries verified live available slots via `/api/crm/appointments/slots`, synchronizing with doctor weekly schedules (`doctor_schedules`), temporary slot blocks (`doctor_slot_blocks`), and active bookings in clinic timezone (`Asia/Kolkata`) with dual 12h/24h time parsing resilience (`parseTimeString`).
+5. The high-density appointment dialog features anchored top/bottom bars with a dedicated Close (`X`) button and scrollable body (`max-h-[92vh]`), preventing viewport clipping on any screen resolution.
+6. Fast-track Walk-in Token generator issues instant token slip (`TKN-XXX`) and announces the token on the full-screen reception TV board (`/token-board`) with Web Audio API chime.
+7. An automated WhatsApp appointment confirmation is dispatched asynchronously via transactional outbox.
 
 ### Step 2: Nursing Triage & Vitals
 1. Triage nurse records vitals: Blood Pressure, Pulse, SpO2, Temperature, Weight, Height.

@@ -50,31 +50,123 @@ export default function AppointmentsPage() {
   const router = useRouter();
   const store = useClinicalStore();
 
-  const doctorList = React.useMemo(() => {
-    const docs = store.staff.filter(
-      (s) =>
-        s.role === "doctor" ||
-        s.role.includes("doctor") ||
-        s.role.includes("consultant") ||
-        s.role.includes("specialist")
-    );
-    return [
-      { id: "all", name: "All Doctors & Clinics" },
-      ...docs.map((d) => ({
-        id: d.id,
-        name: `${d.name} (${d.department})`,
-      })),
-    ];
-  }, [store.staff]);
+  const [clinicDoctors, setClinicDoctors] = React.useState<{ id: string; name: string; dept: string }[]>([]);
+  const [dbAppointments, setDbAppointments] = React.useState<Appointment[]>([]);
+  const [isLoadingAppointments, setIsLoadingAppointments] = React.useState(true);
 
-  // Calendar Navigation State (Default to Nov 14, 2026 to match screenshot)
-  const [selectedDate, setSelectedDate] = React.useState<string>("2026-11-14");
-  const [currentYear, setCurrentYear] = React.useState<number>(2026);
-  const [currentMonth, setCurrentMonth] = React.useState<number>(10); // 0-indexed (10 = November)
+  // Calendar Navigation State (Default to today's date)
+  const todayStr = React.useMemo(() => new Date().toISOString().split("T")[0], []);
+  const [selectedDate, setSelectedDate] = React.useState<string>(todayStr);
+  const [currentYear, setCurrentYear] = React.useState<number>(new Date().getFullYear());
+  const [currentMonth, setCurrentMonth] = React.useState<number>(new Date().getMonth()); // 0-indexed
   const [viewMode, setViewMode] = React.useState<CalendarViewType>("matrix");
   const [selectedDoctorId, setSelectedDoctorId] = React.useState<string>("all");
   const [drawerCollapsed, setDrawerCollapsed] = React.useState<boolean>(false);
   const [showTableView, setShowTableView] = React.useState<boolean>(false);
+
+  // 1. Fetch real active clinic doctors from PostgreSQL
+  React.useEffect(() => {
+    let isCurrent = true;
+    fetch("/api/crm/doctors")
+      .then((res) => res.json())
+      .then((data) => {
+        if (!isCurrent) return;
+        if (data.success && Array.isArray(data.doctors)) {
+          setClinicDoctors(
+            data.doctors.map((d: any) => ({
+              id: d.id,
+              name: d.fullName.startsWith("Dr.") ? d.fullName : `Dr. ${d.fullName}`,
+              dept: d.specialty || "General Medicine",
+            }))
+          );
+        }
+      })
+      .catch((e) => console.error("Failed to load clinic doctors:", e));
+
+    return () => {
+      isCurrent = false;
+    };
+  }, []);
+
+  const doctorList = React.useMemo(() => {
+    const list = [{ id: "all", name: "All Doctors & Clinics" }];
+    if (clinicDoctors.length > 0) {
+      for (const d of clinicDoctors) {
+        list.push({ id: d.id, name: `${d.name} (${d.dept})` });
+      }
+    } else {
+      const docs = store.staff.filter(
+        (s) =>
+          s.role === "doctor" ||
+          s.role.includes("doctor") ||
+          s.role.includes("consultant") ||
+          s.role.includes("specialist")
+      );
+      for (const d of docs) {
+        list.push({ id: d.id, name: `${d.name} (${d.department})` });
+      }
+    }
+    return list;
+  }, [clinicDoctors, store.staff]);
+
+  // 2. Fetch real appointments from PostgreSQL database
+  const loadAppointments = React.useCallback(async () => {
+    try {
+      setIsLoadingAppointments(true);
+      const res = await fetch("/api/crm/appointments?limit=200");
+      const data = await res.json().catch(() => ({}));
+      if (data.success && Array.isArray(data.appointments)) {
+        setDbAppointments(
+          data.appointments.map((a: any) => ({
+            id: a.id,
+            organizationId: a.organizationId,
+            branchId: a.branchId || "br-main-001",
+            patientId: a.patientId,
+            patientName: a.patientName || "Unknown Patient",
+            patientPhone: a.patientPhone || "",
+            patientUhid: a.patientUhid || "UHID-GEN",
+            doctorId: a.doctorId,
+            doctorName: a.doctorName || "Assigned Doctor",
+            department: a.department || "General",
+            tokenNumber: a.tokenNumber || 1,
+            appointmentDate: a.appointmentDate,
+            timeSlot: a.timeSlot,
+            status: a.status as AppointmentStatus,
+            priority: a.priority || "normal",
+            source: a.source || "sys",
+            chiefComplaints: a.chiefComplaints || "",
+            consultationFee: Number(a.consultationFee) || 500,
+            isPaid: Boolean(a.isPaid),
+            createdAt: a.createdAt || new Date().toISOString(),
+            updatedAt: a.updatedAt || new Date().toISOString(),
+          }))
+        );
+      }
+    } catch (err) {
+      console.error("Failed to load DB appointments:", err);
+    } finally {
+      setIsLoadingAppointments(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    loadAppointments();
+  }, [loadAppointments]);
+
+  // Merge DB appointments with local store for complete backwards compatibility
+  const activeAppointments = React.useMemo(() => {
+    if (dbAppointments.length > 0) {
+      const seen = new Set(dbAppointments.map((a) => a.id));
+      const merged = [...dbAppointments];
+      for (const a of store.appointments) {
+        if (!seen.has(a.id)) {
+          merged.push(a);
+        }
+      }
+      return merged;
+    }
+    return store.appointments;
+  }, [dbAppointments, store.appointments]);
 
   // Modals state
   const [breakBlockModalOpen, setBreakBlockModalOpen] = React.useState(false);
@@ -178,12 +270,26 @@ export default function AppointmentsPage() {
     setDetailsPopoverOpen(true);
   };
 
-  const handleStatusTransition = (aptId: string, newStatus: AppointmentStatus) => {
+  const handleStatusTransition = async (aptId: string, newStatus: AppointmentStatus) => {
+    setDbAppointments((prev) =>
+      prev.map((a) => (a.id === aptId ? { ...a, status: newStatus } : a))
+    );
     clinicalStore.updateAppointmentStatus(aptId, newStatus);
+
+    try {
+      await fetch(`/api/crm/appointments/${aptId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      loadAppointments();
+    } catch (e) {
+      console.error("Failed to update appointment status in DB:", e);
+    }
   };
 
   const handleExportCsv = () => {
-    const list = store.appointments.filter(
+    const list = activeAppointments.filter(
       (a) => a.appointmentDate === selectedDate && (selectedDoctorId === "all" || a.doctorId === selectedDoctorId)
     );
     if (list.length === 0) {
@@ -489,11 +595,12 @@ export default function AppointmentsPage() {
         {/* Left Drawer Panel */}
         <AppointmentQueueDrawer
           selectedDate={selectedDate}
-          appointments={store.appointments}
+          appointments={activeAppointments}
           selectedDoctorId={selectedDoctorId}
           collapsed={drawerCollapsed}
           onToggleCollapse={() => setDrawerCollapsed((c) => !c)}
           onOpenBooking={handleOpenNewBooking}
+          onStatusTransition={handleStatusTransition}
         />
 
         {/* Right Calendar Grid Container */}
@@ -503,7 +610,7 @@ export default function AppointmentsPage() {
               year={currentYear}
               month={currentMonth}
               selectedDate={selectedDate}
-              appointments={store.appointments}
+              appointments={activeAppointments}
               selectedDoctorId={selectedDoctorId}
               onSelectDate={(newDate) => setSelectedDate(newDate)}
               onSelectAppointment={handleAppointmentClick}
@@ -513,7 +620,7 @@ export default function AppointmentsPage() {
           {viewMode === "day" && (
             <AppointmentDayView
               selectedDate={selectedDate}
-              appointments={store.appointments}
+              appointments={activeAppointments}
               doctorBlocks={store.doctorBlocks}
               selectedDoctorId={selectedDoctorId}
               onSlotClick={handleSlotClickToBook}
@@ -524,7 +631,7 @@ export default function AppointmentsPage() {
           {viewMode === "week" && (
             <AppointmentWeekView
               selectedDate={selectedDate}
-              appointments={store.appointments}
+              appointments={activeAppointments}
               doctorBlocks={store.doctorBlocks}
               selectedDoctorId={selectedDoctorId}
               onSelectDate={(newDate) => setSelectedDate(newDate)}
@@ -537,7 +644,7 @@ export default function AppointmentsPage() {
               year={currentYear}
               month={currentMonth}
               selectedDate={selectedDate}
-              appointments={store.appointments}
+              appointments={activeAppointments}
               selectedDoctorId={selectedDoctorId}
               onSelectDate={(newDate) => setSelectedDate(newDate)}
               onSelectAppointment={handleAppointmentClick}
@@ -581,7 +688,7 @@ export default function AppointmentsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {store.appointments
+              {activeAppointments
                 .filter(
                   (a) =>
                     a.appointmentDate === selectedDate &&
@@ -691,7 +798,10 @@ export default function AppointmentsPage() {
         isQuickWalkIn={isQuickWalkIn}
         initialPatient={selectedPatientForBooking}
         initialDate={selectedDate}
-        onBookSuccess={() => setSelectedPatientForBooking(null)}
+        onBookSuccess={() => {
+          setSelectedPatientForBooking(null);
+          loadAppointments();
+        }}
       />
 
       {/* 6. Printable Cabin Day Schedule Sheet */}
@@ -707,6 +817,10 @@ export default function AppointmentsPage() {
         appointment={selectedAppointment}
         open={detailsPopoverOpen}
         onOpenChange={setDetailsPopoverOpen}
+        onStatusTransition={handleStatusTransition}
+        onReschedule={(_aptId, _date, _slot) => {
+          loadAppointments();
+        }}
       />
     </div>
   );

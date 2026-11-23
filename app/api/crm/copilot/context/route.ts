@@ -18,6 +18,7 @@ export async function GET(request: NextRequest) {
     const patientId = searchParams.get("patientId") || undefined;
     const requestedDoctorId = searchParams.get("doctorId") || undefined;
     const appointmentId = searchParams.get("appointmentId") || undefined;
+    const dateParam = searchParams.get("date") || undefined;
 
     // 1. Resolve clinic timezone and today's date
     const [profile] = await db
@@ -34,6 +35,8 @@ export async function GET(request: NextRequest) {
       day: "2-digit",
     }).format(new Date());
 
+    const targetDate = dateParam || todayDateStr;
+
     // 2. Resolve linked doctor for the current user (if user is doctor or staff)
     const [linkedDoc] = await db
       .select()
@@ -42,15 +45,26 @@ export async function GET(request: NextRequest) {
       .limit(1);
 
     const linkedDoctorId = linkedDoc?.id || null;
-    const activeDoctorFilter = requestedDoctorId || linkedDoctorId || undefined;
+
+    // Doctor filter logic:
+    // - If requestedDoctorId === "all", show all doctors' queues (no filter)
+    // - If requestedDoctorId is a specific doctor UUID, filter by it
+    // - If not provided and user is a doctor with a linked doctor row, default to their own queue
+    // - If not provided and user is owner/admin/staff, show all appointments so nothing is hidden
+    let effectiveDoctorFilter: string | undefined = undefined;
+    if (requestedDoctorId && requestedDoctorId !== "all") {
+      effectiveDoctorFilter = requestedDoctorId;
+    } else if (!requestedDoctorId && role === "doctor" && linkedDoctorId) {
+      effectiveDoctorFilter = linkedDoctorId;
+    }
 
     // 3. Today's OPD Queue
     const queueConditions = [
       eq(appointments.organizationId, clinicId),
-      eq(appointments.appointmentDate, todayDateStr),
+      eq(appointments.appointmentDate, targetDate),
     ];
-    if (activeDoctorFilter) {
-      queueConditions.push(eq(appointments.doctorId, activeDoctorFilter));
+    if (effectiveDoctorFilter) {
+      queueConditions.push(eq(appointments.doctorId, effectiveDoctorFilter));
     }
 
     const todayQueue = await db

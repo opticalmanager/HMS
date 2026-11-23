@@ -31,12 +31,16 @@ interface AppointmentDetailsPopoverProps {
   appointment: Appointment | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onStatusTransition?: (aptId: string, status: AppointmentStatus) => void;
+  onReschedule?: (aptId: string, date: string, slot: string) => void;
 }
 
 export function AppointmentDetailsPopover({
   appointment,
   open,
   onOpenChange,
+  onStatusTransition,
+  onReschedule,
 }: AppointmentDetailsPopoverProps) {
   const [rescheduleMode, setRescheduleMode] = React.useState(false);
   const [newDate, setNewDate] = React.useState("");
@@ -52,21 +56,60 @@ export function AppointmentDetailsPopover({
 
   if (!appointment) return null;
 
-  const handleStatusChange = (status: AppointmentStatus) => {
+  const handleStatusChange = async (status: AppointmentStatus) => {
     clinicalStore.updateAppointmentStatus(appointment.id, status);
+    if (onStatusTransition) {
+      onStatusTransition(appointment.id, status);
+    }
     onOpenChange(false);
+
+    try {
+      await fetch(`/api/crm/appointments/${appointment.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+    } catch (e) {
+      console.error("Failed to patch appointment status to DB:", e);
+    }
   };
 
-  const handleConfirmReschedule = () => {
+  const handleConfirmReschedule = async () => {
     if (!newDate) return;
     clinicalStore.rescheduleAppointment(appointment.id, newDate, newSlot);
+    if (onReschedule) {
+      onReschedule(appointment.id, newDate, newSlot);
+    }
     setRescheduleMode(false);
     onOpenChange(false);
+
+    try {
+      await fetch(`/api/crm/appointments/${appointment.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ appointmentDate: newDate, timeSlot: newSlot }),
+      });
+    } catch (e) {
+      console.error("Failed to patch rescheduled appointment to DB:", e);
+    }
   };
 
-  const handleCancelAppointment = () => {
+  const handleCancelAppointment = async () => {
     clinicalStore.cancelAppointment(appointment.id, "Cancelled from calendar popover");
+    if (onStatusTransition) {
+      onStatusTransition(appointment.id, "cancelled");
+    }
     onOpenChange(false);
+
+    try {
+      await fetch(`/api/crm/appointments/${appointment.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "cancelled" }),
+      });
+    } catch (e) {
+      console.error("Failed to cancel appointment in DB:", e);
+    }
   };
 
   return (

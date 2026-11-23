@@ -425,7 +425,13 @@ export function decryptBroadcastApiKey(cipherString: string): string;
 - **Payload**: `{ id, name?, category?, price?, taxRate?, hsnSacCode?, isActive? }`
 - **Response**: `{ success: true, tariff: {...} }`
 
-### 15. `POST /api/crm/appointments`
+### 15. `GET /api/crm/appointments/slots`
+- **Purpose**: Query verified open time slots for a doctor on a specific date, calculated in clinic timezone (`Asia/Kolkata`) against weekly schedules, slot blocks, and active bookings.
+- **RBAC Requirement**: `{ appointment: ["read"] }`
+- **Query Params**: `doctorId` (UUID), `date` (`YYYY-MM-DD`, default today)
+- **Response**: HTTP 200 `{ success: true, doctorId, date, slots: [{ slotStart, slotEnd, timeSlot, localDisplay }] }`
+
+### 16. `POST /api/crm/appointments`
 - **Purpose**: Atomically schedule an appointment with concurrency locking, slot block conflict detection, and write idempotency.
 - **RBAC Requirement**: `{ appointment: ["create"] }`
 - **Payload**: `{ patientId, doctorId, branchId?, department, appointmentDate, timeSlot, slotStart?, slotEnd?, source?, idempotencyKey?, tokenNumber?, priority?, chiefComplaints?, consultationFee? }`
