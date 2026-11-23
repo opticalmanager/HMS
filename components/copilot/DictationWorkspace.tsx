@@ -91,8 +91,6 @@ export function DictationWorkspace({
           if (permissionStatus.state === "granted") {
             setMicError(null);
             setShowPermissionHelp(false);
-          } else if (permissionStatus.state === "denied") {
-            setMicError("Microphone permission was denied by the browser.");
           }
 
           // Live reactive update when user toggles permission in browser address bar
@@ -103,6 +101,7 @@ export function DictationWorkspace({
               setShowPermissionHelp(false);
             } else if (permissionStatus.state === "denied") {
               setMicError("Microphone permission was denied by the browser.");
+              setShowPermissionHelp(true);
             }
           };
         })
@@ -261,11 +260,7 @@ export function DictationWorkspace({
       return;
     }
 
-    if (micPermission === "denied") {
-      setShowPermissionHelp(true);
-      return;
-    }
-
+    // Always attempt recording on user gesture to trigger browser's native permission prompt
     startRecording();
   };
 
@@ -383,37 +378,29 @@ export function DictationWorkspace({
                     "h-16 w-16 rounded-full flex items-center justify-center text-white shadow-md transition-all duration-200 cursor-pointer",
                     disabled
                       ? "bg-slate-300 cursor-not-allowed"
-                      : micPermission === "denied"
-                      ? "bg-amber-600 hover:bg-amber-700 shadow-amber-500/20"
                       : "bg-[#2563EB] hover:bg-blue-700 hover:scale-105 active:scale-95 shadow-blue-500/20"
                   )}
-                  title={
-                    micPermission === "denied"
-                      ? "Microphone access blocked - Click to see instructions"
-                      : "Click to start dictating"
-                  }
+                  title="Click to start dictating"
                 >
                   {isRequestingPermission ? (
                     <Loader2 className="h-7 w-7 animate-spin" />
-                  ) : micPermission === "denied" ? (
-                    <MicOff className="h-7 w-7" />
                   ) : (
                     <Mic className="h-7 w-7" />
                   )}
                 </button>
 
                 {micPermission === "denied" && (
-                  <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-amber-500 text-white flex items-center justify-center text-[10px] shadow-sm">
+                  <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-amber-500 text-white flex items-center justify-center text-[10px] shadow-sm" title="Microphone permission required">
                     <Lock className="h-3 w-3" />
                   </span>
                 )}
               </div>
 
               <span className="text-xs font-semibold text-slate-700">
-                {micPermission === "denied"
-                  ? "Microphone access blocked in browser"
-                  : isRequestingPermission
+                {isRequestingPermission
                   ? "Requesting microphone permission..."
+                  : micPermission === "denied"
+                  ? "Microphone access blocked — Click to allow in browser"
                   : "Click microphone to start recording doctor dictation"}
               </span>
               <span className="text-[10px] text-slate-400 max-w-xs">
@@ -432,7 +419,7 @@ export function DictationWorkspace({
           {/* =========================================================================
               PRODUCTION PERMISSION RECOVERY & GUIDANCE CARD
              ========================================================================= */}
-          {(showPermissionHelp || (micPermission === "denied" && !isRecording && !isProcessing)) && (
+          {showPermissionHelp && !isRecording && !isProcessing && (
             <div className="w-full max-w-md mt-4 p-4 rounded-xl bg-amber-50/90 border border-amber-200 text-slate-800 text-xs shadow-2xs">
               <div className="flex items-start gap-3">
                 <div className="h-8 w-8 rounded-lg bg-amber-100 border border-amber-300 text-amber-800 flex items-center justify-center shrink-0">
@@ -458,7 +445,7 @@ export function DictationWorkspace({
 
                   <ol className="mt-2 space-y-1 text-[11px] text-slate-700 list-decimal list-inside bg-white/80 p-2.5 rounded-lg border border-amber-200/60 font-medium">
                     <li>
-                      Click the <strong className="text-slate-900">Lock (🔒) or Settings icon</strong> in your browser&apos;s address bar (left of the URL).
+                      Click the <strong className="text-slate-900">Site Settings / Sliders (⚙/🎛) or Lock (🔒) icon</strong> in your browser&apos;s address bar (left of the URL).
                     </li>
                     <li>
                       Find <strong className="text-slate-900">Microphone</strong> and switch it from <em>Block</em> to <strong className="text-emerald-700">Allow</strong>.
