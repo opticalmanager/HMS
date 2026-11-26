@@ -290,9 +290,9 @@ export function ContextRail({
               type="button"
               onClick={() => onSelectPatient(item.patientId, item.id)}
               className={cn(
-                "w-full text-left p-2.5 rounded-md transition-colors flex items-start gap-2 cursor-pointer mb-0.5",
+                "w-full text-left p-2.5 rounded-lg transition-all duration-150 flex items-start gap-2 cursor-pointer mb-1 active:scale-[0.99]",
                 isSelected
-                  ? "bg-blue-50/80 border border-[#2563EB]/40 shadow-2xs"
+                  ? "bg-blue-50/90 border border-[#2563EB] shadow-xs ring-1 ring-[#2563EB]/20"
                   : "hover:bg-slate-50 border border-transparent"
               )}
             >
@@ -358,9 +358,9 @@ export function ContextRail({
                   type="button"
                   onClick={() => onSelectPatient(patient.id, undefined)}
                   className={cn(
-                    "w-full text-left p-2 rounded-md transition-colors flex items-start gap-2 cursor-pointer mb-0.5",
+                    "w-full text-left p-2 rounded-lg transition-all duration-150 flex items-start gap-2 cursor-pointer mb-1 active:scale-[0.99]",
                     isSelected
-                      ? "bg-blue-50/80 border border-[#2563EB]/40"
+                      ? "bg-blue-50/90 border border-[#2563EB] shadow-xs ring-1 ring-[#2563EB]/20"
                       : "hover:bg-slate-50 border border-transparent"
                   )}
                 >

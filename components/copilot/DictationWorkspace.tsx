@@ -12,6 +12,9 @@ import {
   AlertCircle,
   X,
   CheckCircle2,
+  Trash2,
+  Volume2,
+  Radio,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -56,6 +59,7 @@ export function DictationWorkspace({
   const [showPermissionHelp, setShowPermissionHelp] = React.useState(false);
   const [showPermissionSuccess, setShowPermissionSuccess] = React.useState(false);
   const [noPatientWarning, setNoPatientWarning] = React.useState(false);
+  const [audioVolume, setAudioVolume] = React.useState(0);
 
   const mediaRecorderRef = React.useRef<MediaRecorder | null>(null);
   const audioChunksRef = React.useRef<Blob[]>([]);
@@ -64,6 +68,8 @@ export function DictationWorkspace({
   const animationFrameRef = React.useRef<number | null>(null);
   const audioContextRef = React.useRef<AudioContext | null>(null);
   const analyserRef = React.useRef<AnalyserNode | null>(null);
+  const frameCountRef = React.useRef(0);
+  const isRecordingRef = React.useRef(false);
 
   // 3-minute hard ceiling (180s)
   const MAX_RECORDING_SECS = 180;
@@ -120,7 +126,7 @@ export function DictationWorkspace({
     }
   }, []);
 
-  // Visualizer loop for live audio waveform
+  // Visualizer loop for live audio waveform (mirrored glowing equalized soundwave)
   const drawWaveform = () => {
     if (!canvasRef.current || !analyserRef.current) return;
     const canvas = canvasRef.current;
@@ -132,19 +138,78 @@ export function DictationWorkspace({
     const dataArray = new Uint8Array(bufferLength);
 
     const render = () => {
+      if (!isRecordingRef.current) return;
       animationFrameRef.current = requestAnimationFrame(render);
       analyser.getByteFrequencyData(dataArray);
 
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      const barWidth = (canvas.width / bufferLength) * 2.5;
-      let x = 0;
-
+      // Compute live decibel/volume level
+      let sum = 0;
       for (let i = 0; i < bufferLength; i++) {
-        const barHeight = (dataArray[i] / 255) * canvas.height;
-        ctx.fillStyle = `rgb(37, 99, 235, ${Math.max(0.2, dataArray[i] / 255)})`;
-        ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
-        x += barWidth + 2;
+        sum += dataArray[i];
+      }
+      const avg = sum / bufferLength;
+      const vol = Math.min(100, Math.round((avg / 255) * 100));
+
+      // Throttled volume state update for badge & ripple (10 fps)
+      frameCountRef.current++;
+      if (frameCountRef.current % 6 === 0) {
+        setAudioVolume(vol);
+      }
+
+      const width = canvas.width;
+      const height = canvas.height;
+      const centerY = height / 2;
+
+      ctx.clearRect(0, 0, width, height);
+
+      // Draw subtle centerline guide
+      ctx.strokeStyle = "rgba(148, 163, 184, 0.25)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(12, centerY);
+      ctx.lineTo(width - 12, centerY);
+      ctx.stroke();
+
+      // Render 36 mirrored pill bars centered across the canvas
+      const barCount = 36;
+      const barWidth = 4;
+      const gap = 4;
+      const totalWidth = barCount * barWidth + (barCount - 1) * gap;
+      const startX = Math.max(8, (width - totalWidth) / 2);
+
+      // Linear gradient for bars: sky blue -> primary blue
+      const gradient = ctx.createLinearGradient(0, 0, 0, height);
+      gradient.addColorStop(0, "#38BDF8");
+      gradient.addColorStop(0.5, "#60A5FA");
+      gradient.addColorStop(1, "#2563EB");
+
+      ctx.fillStyle = gradient;
+      ctx.shadowColor = "rgba(56, 189, 248, 0.45)";
+      ctx.shadowBlur = 6;
+
+      for (let i = 0; i < barCount; i++) {
+        // Sample frequency spectrum
+        const binIndex = Math.min(
+          bufferLength - 1,
+          Math.floor((i / barCount) * (bufferLength * 0.8))
+        );
+        const rawValue = dataArray[binIndex] || 0;
+        const normalized = rawValue / 255;
+
+        // Subtle dynamic rhythmic wave modulation
+        const idlePulse = Math.sin(Date.now() / 250 + i * 0.35) * 1.5;
+        const barHeight = Math.max(6, normalized * (height - 14) + idlePulse);
+
+        const x = startX + i * (barWidth + gap);
+        const y = centerY - barHeight / 2;
+
+        ctx.beginPath();
+        if (typeof (ctx as any).roundRect === "function") {
+          (ctx as any).roundRect(x, y, barWidth, barHeight, 2);
+        } else {
+          ctx.rect(x, y, barWidth, barHeight);
+        }
+        ctx.fill();
       }
     };
     render();
@@ -227,7 +292,8 @@ export function DictationWorkspace({
       audioContextRef.current = audioCtx;
       const source = audioCtx.createMediaStreamSource(stream);
       const analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 64;
+      analyser.fftSize = 128;
+      analyser.smoothingTimeConstant = 0.75;
       source.connect(analyser);
       analyserRef.current = analyser;
 
@@ -248,6 +314,7 @@ export function DictationWorkspace({
       };
 
       recorder.onstop = async () => {
+        isRecordingRef.current = false;
         // Stop audio tracks
         stream.getTracks().forEach((track) => track.stop());
         if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
@@ -260,8 +327,11 @@ export function DictationWorkspace({
       };
 
       recorder.start(500); // 500ms chunks
+      isRecordingRef.current = true;
       setIsRecording(true);
       setRecordingSeconds(0);
+      setAudioVolume(0);
+      frameCountRef.current = 0;
 
       // Start waveform drawing
       drawWaveform();
@@ -277,6 +347,7 @@ export function DictationWorkspace({
         });
       }, 1000);
     } catch (err: any) {
+      isRecordingRef.current = false;
       setIsRecording(false);
       const errName = err?.name || "";
       const errMsg = err?.message || "";
@@ -302,11 +373,38 @@ export function DictationWorkspace({
   };
 
   const stopRecording = () => {
+    isRecordingRef.current = false;
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
       mediaRecorderRef.current.stop();
     }
     setIsRecording(false);
+    setAudioVolume(0);
     if (timerRef.current) clearInterval(timerRef.current);
+  };
+
+  const discardRecording = () => {
+    isRecordingRef.current = false;
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+
+    if (mediaRecorderRef.current) {
+      try {
+        // Detach onstop callback so it does not send audio to the AI API
+        mediaRecorderRef.current.onstop = null;
+        if (mediaRecorderRef.current.state !== "inactive") {
+          mediaRecorderRef.current.stop();
+        }
+      } catch (err) {}
+    }
+
+    if (audioContextRef.current && audioContextRef.current.state !== "closed") {
+      audioContextRef.current.close().catch(() => {});
+    }
+
+    audioChunksRef.current = [];
+    setIsRecording(false);
+    setRecordingSeconds(0);
+    setAudioVolume(0);
   };
 
   const handleMicButtonClick = () => {
@@ -491,57 +589,131 @@ export function DictationWorkspace({
         {/* Mic Visualizer / Record Hero Area */}
         <div className="flex flex-col items-center justify-center py-4 px-3 bg-slate-50/60 rounded-xl border border-slate-200/80 mb-3">
           {isRecording ? (
-            <div className="flex flex-col items-center space-y-3 w-full max-w-md">
-              {/* Waveform Canvas */}
-              <canvas
-                ref={canvasRef}
-                width={360}
-                height={40}
-                className="w-full h-10 rounded bg-white border border-slate-200"
-              />
+            <div className="flex flex-col items-center space-y-3.5 w-full max-w-xl animate-in fade-in-50 duration-200">
+              {/* Header: Live Volume Meter + Recording Timer */}
+              <div className="flex items-center justify-between w-full px-2">
+                {/* Voice Activity Indicator */}
+                <div className="flex items-center gap-1.5">
+                  {audioVolume > 10 ? (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs">
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                      </span>
+                      Speaking Detected ({audioVolume}%)
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                      <span className="inline-block h-2 w-2 rounded-full bg-slate-400" />
+                      Listening (Speak into microphone)
+                    </span>
+                  )}
+                </div>
 
-              <div className="flex items-center gap-3">
-                <span className="flex h-3 w-3 relative">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-600" />
-                </span>
-                <span className="font-mono text-sm font-bold text-rose-600">
-                  {formatTimer(recordingSeconds)} / 3:00
-                </span>
+                {/* Monospace Timer Badge */}
+                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold tabular-nums shadow-2xs">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-600" />
+                  </span>
+                  <span>{formatTimer(recordingSeconds)}</span>
+                  <span className="text-rose-400 text-[10px]">/ 3:00</span>
+                </div>
               </div>
 
-              <Button
-                type="button"
-                onClick={stopRecording}
-                className="h-10 px-6 rounded-full bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs gap-2 shadow-sm cursor-pointer"
-              >
-                <Square className="h-3.5 w-3.5 fill-current" />
-                Stop & Extract Clinical Record
-              </Button>
+              {/* High-Definition Mirrored Waveform Viewport */}
+              <div className="w-full relative px-1">
+                <div className="relative rounded-xl overflow-hidden bg-slate-950 border border-slate-800 shadow-inner p-1.5">
+                  <canvas
+                    ref={canvasRef}
+                    width={480}
+                    height={64}
+                    className="w-full h-16 block rounded-lg"
+                  />
+                </div>
+              </div>
+
+              {/* Action Buttons: Stop & Extract + Discard */}
+              <div className="flex items-center gap-3 pt-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={discardRecording}
+                  className="h-9 px-3.5 rounded-full text-slate-600 border-slate-300 hover:text-rose-600 hover:border-rose-300 hover:bg-rose-50/70 active:scale-95 transition-all text-xs gap-1.5 cursor-pointer"
+                  title="Discard this recording without processing"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Discard Note
+                </Button>
+
+                <div className="relative group">
+                  {/* Dynamic Glowing Volume Aura */}
+                  <div
+                    className="absolute -inset-1 rounded-full bg-rose-500/30 blur-xs transition-opacity duration-150"
+                    style={{
+                      opacity: Math.max(0.3, Math.min(1, 0.3 + (audioVolume / 100) * 0.7)),
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    onClick={stopRecording}
+                    className="relative h-10 px-6 rounded-full bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs gap-2 shadow-md shadow-rose-600/30 active:scale-95 transition-all cursor-pointer"
+                  >
+                    <Square className="h-3.5 w-3.5 fill-current" />
+                    Stop & Extract Clinical Record
+                  </Button>
+                </div>
+              </div>
             </div>
           ) : isProcessing ? (
-            <div className="flex flex-col items-center justify-center py-4 space-y-2 text-center">
-              <Loader2 className="h-7 w-7 text-[#2563EB] animate-spin" />
-              <p className="text-xs font-semibold text-slate-800">
-                {statusMessage || "Gemini 3.5 Multimodal Reasoning Pipeline Active..."}
-              </p>
-              <p className="text-[11px] text-slate-400 max-w-sm">
-                Extracting clinical diagnosis, grounding medicines against pg_trgm catalog, and cross-checking allergies.
-              </p>
+            <div className="flex flex-col items-center justify-center py-5 space-y-3 text-center max-w-md mx-auto animate-in fade-in-50 duration-300">
+              <div className="relative h-12 w-12 flex items-center justify-center">
+                <div className="absolute inset-0 rounded-full bg-blue-500/20 animate-ping" />
+                <div className="relative h-11 w-11 rounded-full bg-[#2563EB] text-white flex items-center justify-center shadow-md shadow-blue-500/30">
+                  <Sparkles className="h-5 w-5 animate-pulse" />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-xs font-bold text-slate-900">
+                  {statusMessage || "Gemini 3.5 Multimodal Reasoning Pipeline Active..."}
+                </p>
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  Transcribing audio notes, grounding drugs against pg_trgm catalog, and cross-checking allergies.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-1.5 text-[10px] text-blue-700 bg-blue-50 px-3 py-1 rounded-full border border-blue-200">
+                <CheckCircle2 className="h-3 w-3 text-blue-600 shrink-0" />
+                <span>HITL Guardrail: Generates draft only. You verify before final approval.</span>
+              </div>
             </div>
           ) : (
-            <div className="flex flex-col items-center space-y-2 text-center">
-              <div className="relative">
+            <div className="flex flex-col items-center space-y-3 text-center py-2 animate-in fade-in-50 duration-200">
+              <div className="relative group">
+                {/* Breathing ambient aura ring */}
+                <div
+                  className={cn(
+                    "absolute -inset-2.5 rounded-full transition-all duration-300 blur-xs",
+                    micPermission === "granted" && hasPatient
+                      ? "bg-blue-500/15 group-hover:bg-blue-500/25 group-hover:scale-110"
+                      : micPermission === "denied"
+                      ? "bg-amber-500/15 group-hover:bg-amber-500/25"
+                      : "bg-slate-400/10 group-hover:bg-blue-500/20"
+                  )}
+                />
+
                 <button
                   type="button"
                   onClick={handleMicButtonClick}
                   disabled={isProcessing}
                   className={cn(
-                    "h-16 w-16 rounded-full flex items-center justify-center text-white shadow-md transition-all duration-200 cursor-pointer",
-                    isRecording
-                      ? "bg-rose-600 hover:bg-rose-700 shadow-rose-500/20"
-                      : micPermission === "denied"
-                      ? "bg-amber-600 hover:bg-amber-700 hover:scale-105 active:scale-95 shadow-amber-500/20"
+                    "relative h-16 w-16 rounded-full flex items-center justify-center text-white shadow-md transition-all duration-200 cursor-pointer",
+                    micPermission === "denied"
+                      ? "bg-amber-600 hover:bg-amber-700 hover:scale-105 active:scale-95 shadow-amber-500/25"
+                      : micPermission === "granted" && hasPatient
+                      ? "bg-linear-to-b from-[#2563EB] to-[#1D4ED8] hover:from-blue-600 hover:to-blue-800 hover:scale-105 active:scale-95 shadow-blue-500/30"
                       : "bg-[#2563EB] hover:bg-blue-700 hover:scale-105 active:scale-95 shadow-blue-500/20"
                   )}
                   title={
@@ -555,13 +727,13 @@ export function DictationWorkspace({
                   {isRequestingPermission ? (
                     <Loader2 className="h-7 w-7 animate-spin" />
                   ) : (
-                    <Mic className="h-7 w-7" />
+                    <Mic className="h-7 w-7 transition-transform group-hover:scale-110 duration-200" />
                   )}
                 </button>
 
                 {micPermission === "denied" && (
                   <span
-                    className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-amber-500 text-white flex items-center justify-center text-[10px] shadow-sm"
+                    className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-amber-500 text-white flex items-center justify-center text-[10px] shadow-sm border-2 border-white"
                     title="Microphone permission required"
                   >
                     <Lock className="h-3 w-3" />
@@ -569,22 +741,22 @@ export function DictationWorkspace({
                 )}
               </div>
 
-              <span className="text-xs font-semibold text-slate-700">
-                {isRequestingPermission
-                  ? "Requesting microphone permission in browser..."
-                  : micPermission === "denied"
-                  ? "Microphone access blocked — Click to unblock in browser"
-                  : micPermission !== "granted"
-                  ? "Click microphone to enable browser audio access"
-                  : isRecording
-                  ? "Recording clinical voice dictation..."
-                  : hasPatient
-                  ? `Click microphone to start dictating for ${patientName}`
-                  : "Click microphone to test audio (Select patient on left to dictate)"}
-              </span>
-              <span className="text-[10px] text-slate-400 max-w-xs">
-                Speaks Hindi, English & medical shorthand (OD, BD, TDS, SOS)
-              </span>
+              <div className="space-y-1">
+                <span className="text-xs font-semibold text-slate-800 block">
+                  {isRequestingPermission
+                    ? "Requesting microphone permission in browser..."
+                    : micPermission === "denied"
+                    ? "Microphone access blocked — Click to unblock in browser"
+                    : micPermission !== "granted"
+                    ? "Click microphone to enable browser audio access"
+                    : hasPatient
+                    ? `Click microphone to start dictating for ${patientName}`
+                    : "Click microphone to test audio (Select patient on left to dictate)"}
+                </span>
+                <span className="text-[11px] text-slate-400 block max-w-sm mx-auto">
+                  Speaks Hindi, English & medical shorthand (OD, BD, TDS, SOS)
+                </span>
+              </div>
 
               {isRequestingPermission && (
                 <div className="p-2 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 text-[11px] animate-pulse flex items-center gap-1.5 mt-2">

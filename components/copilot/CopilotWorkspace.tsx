@@ -346,16 +346,16 @@ export function CopilotWorkspace() {
             </TabsList>
           </Tabs>
 
-          <div className="hidden sm:flex items-center gap-2 text-[11px] text-slate-500">
+          <div className="hidden sm:flex items-center gap-2 text-[11px] text-slate-600 bg-slate-50 border border-slate-200/80 px-2.5 py-1 rounded-md">
             <span>Doctor Desk:</span>
-            <strong className="text-slate-800">
+            <strong className="text-slate-800 font-semibold">
               Dr. {activeDoctorObj?.fullName || "Physician"}
             </strong>
           </div>
         </div>
 
         {contextError && (
-          <div className="mx-4 mt-2 p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center justify-between">
+          <div className="mx-4 mt-2 p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center justify-between animate-in fade-in-50 duration-200">
             <div className="flex items-center gap-2">
               <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
               <span>{contextError}</span>
@@ -371,7 +371,7 @@ export function CopilotWorkspace() {
 
         {/* Tab 1: Voice Dictation & HITL Drafts */}
         {activeTab === "dictation" ? (
-          <div className="flex-1 overflow-y-auto p-4 sm:p-5">
+          <div className="flex-1 overflow-y-auto p-4 sm:p-5 animate-in fade-in-50 duration-200">
             <ClinicalSafetyBanner allergyAlerts={allergyAlerts} />
 
             <DictationWorkspace
@@ -385,7 +385,7 @@ export function CopilotWorkspace() {
             />
 
             {hasDrafts && (
-              <>
+              <div className="space-y-4 animate-in fade-in-50 slide-in-from-bottom-2 duration-300 ease-out">
                 <DraftPrescriptionCard
                   prescriptionId={prescriptionId}
                   chiefComplaint={chiefComplaint}
@@ -408,7 +408,7 @@ export function CopilotWorkspace() {
                   onChangeNotes={setInvoiceNotes}
                   readOnly={isApproved}
                 />
-              </>
+              </div>
             )}
 
             <StickyActionBar
@@ -425,7 +425,7 @@ export function CopilotWorkspace() {
           </div>
         ) : (
           /* Tab 2: Context-Aware Streaming Assistant Chat */
-          <div className="flex-1 overflow-hidden p-3 sm:p-4">
+          <div className="flex-1 overflow-hidden p-3 sm:p-4 animate-in fade-in-50 duration-200">
             <CopilotChatWorkspace
               patientId={selectedPatient?.id}
               appointmentId={activeAppointmentId}

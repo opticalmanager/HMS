@@ -162,7 +162,18 @@ The **Doctor AI Copilot** is a high-density, multi-tenant clinical workspace des
        - If attempted without an active patient, guides the clinician to select or register a walk-in patient from the left rail.
        - If blocked/denied by browser policy (where browsers suppress native dialogs), displays a high-density, dismissible **Microphone Permission Required** card with 3-step address-bar unlock instructions.
        - Includes quick-action **Re-check & Test Microphone** and 1-click **Use Text Note Fallback** to keep doctors unblocked.
-     - Real-time animated audio visualizer canvas driven by `AudioContext` and `AnalyserNode`.
+     - **Organic Mirrored Audio Waveform & Real-Time Decibel Meter (`DictationWorkspace.tsx`)**:
+       - High-definition mirrored equalizer canvas (`AudioContext`, `AnalyserNode`) rendering 36 smooth rounded pill capsules (`roundRect`) inside a dark glass viewport (`bg-slate-950 border-slate-800`).
+       - Gradient fill (`#38BDF8` cyan to `#2563EB` royal blue) with soft glow and gentle sinusoidal wave modulation (`idlePulse`) keeping the canvas organically alive.
+       - Live Voice Activity RMS Meter with real-time status badge: green pulsating beacon for `Speaking Detected (X%)` vs slate beacon for `Listening (Speak into microphone)`.
+       - Concentric glowing aura surrounding the primary Stop button that dynamically scales and breathes in sync with voice volume.
+       - Tactile **Discard Note** button (`Trash2`) allowing clinicians to reset and discard accidental recordings without initiating an unwanted AI pipeline roundtrip.
+       - Dynamic AI Reasoning Pipeline card with animated sparkles radar, stepped progress indicators, and prominent HITL medical safety reassurance.
+     - **Smooth Workspace Transitions & Micro-Interactions**:
+       - Fluid tab-switching between Voice Dictation and Copilot Assistant Chat (`transition-all duration-200 animate-in fade-in-50`).
+       - Animated slide-up entrance for newly extracted drafts (`animate-in fade-in-50 slide-in-from-bottom-2 duration-300 ease-out`).
+       - Compact high-density queue cards with active selection ring (`ring-1 ring-[#2563EB]/20 bg-blue-50/90`) and tactile press feedback (`active:scale-[0.99]`).
+       - Interactive table rows with subtle hover transitions (`hover:bg-slate-50/70`) and tactile action buttons (`active:scale-95 duration-150`).
      - 3-minute safety limit countdown timer with automatic graceful stop.
      - Hinglish/English sample clinical note loader for rapid development testing.
      - Side-by-side editable **Draft Prescription Card** (`DraftPrescriptionCard.tsx`) and **Draft Invoice Card** (`DraftInvoiceCard.tsx`).

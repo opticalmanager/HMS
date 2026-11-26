@@ -120,7 +120,7 @@ export function DraftInvoiceCard({
               variant="outline"
               size="sm"
               onClick={handleAddConsultationChip}
-              className="h-7 text-[11px] gap-1 border-blue-200 bg-blue-50/50 text-[#2563EB] hover:bg-blue-100 cursor-pointer"
+              className="h-7 text-[11px] gap-1 border-blue-200 bg-blue-50/50 text-[#2563EB] hover:bg-blue-100 active:scale-95 transition-all duration-150 cursor-pointer"
             >
               <Stethoscope className="h-3 w-3" />
               + Add OPD Consultation (₹500)
@@ -132,7 +132,7 @@ export function DraftInvoiceCard({
               variant="outline"
               size="sm"
               onClick={handleAddItem}
-              className="h-7 text-xs gap-1 border-slate-200 hover:border-[#2563EB] hover:text-[#2563EB] cursor-pointer"
+              className="h-7 text-xs gap-1 border-slate-200 hover:border-[#2563EB] hover:text-[#2563EB] active:scale-95 transition-all duration-150 cursor-pointer"
             >
               <Plus className="h-3 w-3" />
               Add Service
@@ -213,7 +213,7 @@ export function DraftInvoiceCard({
                         <button
                           type="button"
                           onClick={() => handleRemoveItem(idx)}
-                          className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                          className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 active:scale-90 transition-all duration-150 cursor-pointer"
                           title="Remove item"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
