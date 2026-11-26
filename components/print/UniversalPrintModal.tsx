@@ -9,8 +9,8 @@ import { PrintoutEngine, type MockPrintData } from "./PrintoutEngine";
 import {
   DEFAULT_PRINT_CONFIGS,
   type DefaultPrintConfig,
-} from "@/services/domain/print-service";
-import type { PrintTemplateType } from "@/db/schema/print-settings";
+  type PrintTemplateType,
+} from "@/lib/print-defaults";
 
 interface UniversalPrintModalProps {
   open: boolean;

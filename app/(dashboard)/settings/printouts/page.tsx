@@ -23,8 +23,8 @@ import {
 import {
   DEFAULT_PRINT_CONFIGS,
   type DefaultPrintConfig,
-} from "@/services/domain/print-service";
-import type { PrintTemplateType } from "@/db/schema/print-settings";
+  type PrintTemplateType,
+} from "@/lib/print-defaults";
 import { cn } from "@/lib/utils";
 
 const TEMPLATE_TABS: Array<{ id: PrintTemplateType; label: string; badge?: string }> = [

@@ -1,58 +1,11 @@
 import { pgTable, text, timestamp, boolean, uuid, integer, jsonb, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { organizations } from "./organizations";
 
-export const PRINT_TEMPLATE_TYPES = [
-  "opd_treatment",
-  "opd_case_paper",
-  "opd_consent_form",
-  "ipd_document",
-  "ipd_treatment",
-  "ipd_initial_assessment",
-  "lab_order",
-  "opd_billing",
-  "thermal_print",
-] as const;
-
-export type PrintTemplateType = (typeof PRINT_TEMPLATE_TYPES)[number];
-
-export interface PrintSettingsConfig {
-  title?: string;
-  pageSize?: "A4" | "A5" | "3in";
-  marginTop?: string;
-  marginBottom?: string;
-  marginLeft?: string;
-  marginRight?: string;
-  columnType?: "single" | "double";
-  columnWidth?: number; // 10 to 90 %
-  fontSize?: number; // 8 to 15 pt
-  lineSpacing?: number; // 0 to 10 pt
-  fontFamily?: string;
-  displayHeader?: boolean;
-  displayFooter?: boolean;
-  includeLogo?: boolean;
-  displayDoctorDetails?: boolean;
-  displaySignature?: boolean;
-  patientKinSignature?: boolean;
-  displayBarcode?: boolean;
-  displayDateTime?: boolean;
-  displayVitals?: boolean;
-  displayPatientDetailsInColumns?: boolean;
-  headerHeight?: string;
-  headerImageUrl?: string | null;
-  footerImageUrl?: string | null;
-  footerText?: string;
-  billHeader?: string;
-  receiptHeader?: string;
-  depositHeader?: string;
-  refundHeader?: string;
-  displayOperatorName?: boolean;
-  displayHsnCode?: boolean;
-  displayGstNumber?: boolean;
-  hsnCodeLabel?: string;
-  printOrder?: string[];
-  visibleFields?: Record<string, boolean>;
-  customConfig?: Record<string, unknown>;
-}
+export {
+  PRINT_TEMPLATE_TYPES,
+  type PrintTemplateType,
+  type PrintSettingsConfig,
+} from "@/lib/print-defaults";
 
 export const printSettings = pgTable(
   "print_settings",

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PRINT_TEMPLATE_TYPES } from "@/db/schema/print-settings";
+import { PRINT_TEMPLATE_TYPES } from "@/lib/print-defaults";
 
 export const printTemplateTypeSchema = z.enum(PRINT_TEMPLATE_TYPES);
 

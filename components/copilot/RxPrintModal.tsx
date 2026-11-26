@@ -9,9 +9,9 @@ import { PrintoutEngine, type MockPrintData } from "@/components/print/PrintoutE
 import {
   DEFAULT_PRINT_CONFIGS,
   type DefaultPrintConfig,
-} from "@/services/domain/print-service";
+  type PrintTemplateType,
+} from "@/lib/print-defaults";
 import type { GroundedPrescriptionItem } from "@/services/domain/prescription-service";
-import type { PrintTemplateType } from "@/db/schema/print-settings";
 
 interface RxPrintModalProps {
   open: boolean;
