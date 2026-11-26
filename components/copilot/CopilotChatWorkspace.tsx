@@ -57,7 +57,7 @@ export function CopilotChatWorkspace({
     {
       id: "intro",
       role: "assistant",
-      content: `Hello! I am your Doctor AI Copilot powered by Gemini 3.5. I have preloaded today's OPD queue and active patient context. Ask me anything about appointments, patient records, or dictations.`,
+      content: `Hello! I am your Clinical AI Copilot. I have preloaded today's OPD queue and active patient context. Ask me anything about appointments, patient records, or clinical encounters.`,
     },
   ]);
   const [inputMessage, setInputMessage] = React.useState("");
@@ -250,7 +250,7 @@ export function CopilotChatWorkspace({
             <Sparkles className="h-3.5 w-3.5" />
           </div>
           <div>
-            <h3 className="font-bold text-slate-800 text-xs">Doctor AI Copilot Chat (Gemini 3.5)</h3>
+            <h3 className="font-bold text-slate-800 text-xs">Doctor AI Copilot Chat</h3>
             <p className="text-[10px] text-slate-400">Context preloaded: OPD Queue, Patients & Doctor Schedule</p>
           </div>
         </div>

@@ -20,7 +20,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
-interface DictationWorkspaceProps {
+export interface DictationWorkspaceRef {
+  startRecording: () => void;
+  stopRecording: () => void;
+  isRecording: boolean;
+  expand: () => void;
+}
+
+export interface DictationWorkspaceProps {
   onDictateAudio: (audioBlob: Blob) => Promise<void>;
   onDictateText: (text: string) => Promise<void>;
   isProcessing: boolean;
@@ -28,28 +35,39 @@ interface DictationWorkspaceProps {
   hasPatient?: boolean;
   patientName?: string;
   disabled?: boolean;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
+  onRecordingChange?: (isRecording: boolean) => void;
 }
 
-const SAMPLE_HINGLISH_NOTE = `Patient Rajesh Kumar, 42 male, comes in with complaint of high grade bukhar since 3 days with chills, severe sir dard and badan dard. 
+export const SAMPLE_HINGLISH_NOTE = `Patient Rajesh Kumar, 42 male, comes in with complaint of high grade bukhar since 3 days with chills, severe sir dard and badan dard. 
 Provisional diagnosis is Acute Viral Fever with suspected Dengue.
 Prescribing: Tab Dolo 650 TDS for 3 days khana khane ke baad, Tab Pantocid 40 OD subah khali pet for 5 days, Tab Augmentin 625 BD for 5 days.
 Ordered complete blood count CBC and Dengue NS1 antigen test. Charge 250 for urgent sample collection.
 Follow up after 3 days if fever does not subside.`;
 
-export function DictationWorkspace({
-  onDictateAudio,
-  onDictateText,
-  isProcessing,
-  statusMessage,
-  hasPatient = true,
-  patientName,
-  disabled = false,
-}: DictationWorkspaceProps) {
-  const [isRecording, setIsRecording] = React.useState(false);
-  const [recordingSeconds, setRecordingSeconds] = React.useState(0);
-  const [textInput, setTextInput] = React.useState("");
-  const [showTextInput, setShowTextInput] = React.useState(false);
-  const [micError, setMicError] = React.useState<string | null>(null);
+export const DictationWorkspace = React.forwardRef<DictationWorkspaceRef, DictationWorkspaceProps>(
+  function DictationWorkspace(
+    {
+      onDictateAudio,
+      onDictateText,
+      isProcessing,
+      statusMessage,
+      hasPatient = true,
+      patientName,
+      disabled = false,
+      collapsed = false,
+      onToggleCollapse,
+      onRecordingChange,
+    },
+    ref
+  ) {
+    const [isRecording, setIsRecording] = React.useState(false);
+    const [recordingSeconds, setRecordingSeconds] = React.useState(0);
+    const [textInput, setTextInput] = React.useState("");
+    const [showTextInput, setShowTextInput] = React.useState(false);
+    const [micError, setMicError] = React.useState<string | null>(null);
+    const [internalExpanded, setInternalExpanded] = React.useState(false);
 
   // Permission Lifecycle State: 'granted' | 'prompt' | 'denied' | 'unsupported' | 'unknown'
   const [micPermission, setMicPermission] = React.useState<
@@ -509,8 +527,81 @@ export function DictationWorkspace({
     return `${mins}:${remaining.toString().padStart(2, "0")}`;
   };
 
+  React.useImperativeHandle(
+    ref,
+    () => ({
+      startRecording: () => {
+        setInternalExpanded(true);
+        if (!isRecording) {
+          if (!hasPatient) {
+            setNoPatientWarning(true);
+          } else {
+            setNoPatientWarning(false);
+            startRecording();
+          }
+        }
+      },
+      stopRecording: () => {
+        stopRecording();
+      },
+      isRecording,
+      expand: () => setInternalExpanded(true),
+    }),
+    [isRecording, hasPatient, startRecording]
+  );
+
+  React.useEffect(() => {
+    onRecordingChange?.(isRecording);
+  }, [isRecording, onRecordingChange]);
+
+  const isEffectivelyCollapsed = collapsed && !isRecording && !isProcessing && !internalExpanded;
+
+  if (isEffectivelyCollapsed) {
+    return (
+      <div className="flex items-center justify-between p-2.5 px-3.5 bg-slate-50 border border-slate-200/90 rounded-xl mb-3 shadow-2xs animate-in fade-in-50 duration-200">
+        <div className="flex items-center gap-2">
+          <div className="h-6 w-6 rounded-md bg-[#2563EB]/10 text-[#2563EB] flex items-center justify-center">
+            <Sparkles className="h-3.5 w-3.5" />
+          </div>
+          <span className="text-xs font-semibold text-slate-800">
+            Consultation Encounter Active
+          </span>
+          {hasPatient && patientName && (
+            <span className="text-[10px] font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+              {patientName}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setInternalExpanded(true);
+              handleMicButtonClick();
+            }}
+            className="h-7 text-[11px] gap-1.5 border-blue-200 text-[#2563EB] hover:bg-blue-50 font-medium cursor-pointer"
+          >
+            <Mic className="h-3 w-3" />
+            Record Voice Note
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setInternalExpanded(true)}
+            className="h-7 text-[11px] text-slate-500 hover:text-slate-800 cursor-pointer"
+          >
+            Expand Console
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <Card className="border border-slate-200 shadow-xs bg-linear-to-b from-blue-50/40 via-white to-white mb-4 overflow-hidden">
+    <Card className="border border-slate-200 shadow-xs bg-linear-to-b from-blue-50/40 via-white to-white mb-4 overflow-hidden animate-in fade-in-50 duration-200">
       <CardContent className="p-4 sm:p-5">
         {/* Top Header / Mode Switcher */}
         <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
@@ -521,7 +612,7 @@ export function DictationWorkspace({
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
-                  Native Clinical Voice Dictation (Gemini 3.5 Multimodal)
+                  Clinical Voice Dictation & Assessment
                 </h2>
                 {hasPatient && patientName && (
                   <span className="text-[10px] font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
@@ -536,6 +627,17 @@ export function DictationWorkspace({
           </div>
 
           <div className="flex items-center gap-2">
+            {collapsed && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setInternalExpanded(false)}
+                className="h-7 text-[11px] text-slate-500 hover:text-slate-800 cursor-pointer"
+              >
+                Minimize
+              </Button>
+            )}
             <Button
               type="button"
               variant="outline"
@@ -692,7 +794,7 @@ export function DictationWorkspace({
 
               <div className="space-y-1">
                 <p className="text-xs font-bold text-slate-900">
-                  {statusMessage || "Gemini 3.5 Multimodal Reasoning Pipeline Active..."}
+                  {statusMessage || "Clinical Consultation Intelligence Active..."}
                 </p>
                 <p className="text-[11px] text-slate-500 leading-relaxed">
                   Transcribing audio notes, grounding drugs against pg_trgm catalog, and cross-checking allergies.
@@ -909,4 +1011,6 @@ export function DictationWorkspace({
       </CardContent>
     </Card>
   );
-}
+});
+
+DictationWorkspace.displayName = "DictationWorkspace";

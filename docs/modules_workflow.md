@@ -147,40 +147,42 @@ Hospital administrators, accountants, and clinical heads access 16 operational r
 ### 1. Dedicated Doctor AI Copilot Workspace (`/dashboard/copilot`)
 The **Doctor AI Copilot** is a high-density, multi-tenant clinical workspace designed to eliminate clinical charting fatigue while maintaining uncompromising patient safety and deterministic billing:
 
-1. **3-Pane Docked Architecture (`isDockedWorkspace: true`)**:
+1. **Unified Conversational & Clinical Canvas (`CopilotWorkspace.tsx`)**:
+   - **Zero-Tab Single Canvas Architecture**: Eliminates disjointed tab switching between voice dictation and chat, uniting voice consultation, streaming copilot intelligence, and draft approvals into a single unified clinical stream (ChatGPT / Gemini modern assistant architecture).
+   - **Dynamic Central Welcome Hero**:
+     - Presented on initial encounter load before active dictation or messages.
+     - Displays doctor desk credentials, active patient tag, and a 64px tactile circular Microphone button with ambient breathing aura ring.
+     - 5 quick starter action chips: `Load Sample Hinglish Visit`, `Who is next in today's OPD queue?`, `Check open slots for tomorrow`, `Summarize active patient history & allergies`, `Block doctor schedule 2-4 PM today`.
+     - **Dynamic Collapse Transition**: Smoothly collapses (`animate-in fade-in-50 duration-300`) upon the first voice dictation or text message, yielding screen space to the active encounter feed.
+   - **Integrated Docked Bottom Composer**:
+     - Docked modern composer with mode-selection pill: `[ 🎙️ Clinical Dictation ]` vs `[ 💬 Ask Copilot ]`.
+     - Integrated mic button for instant voice dictation capture.
+     - Auto-expanding `textarea` (`h-9` min height) with keyboard shortcuts (`Enter` to submit, `Shift+Enter` for newline).
+     - Smart routing: automatically detects clinical notes (presence of `Rx`, dosages, symptoms, medications) and triggers structured clinical extraction, or routes operational queries to the assistant chat engine.
    - **Context Rail (Left Pane - `ContextRail.tsx`)**:
      - Live, searchable OPD queue with status badges (`Waiting`, `In Consultation`, `Completed`).
      - Doctor selector with auto-selection of the authenticated doctor's profile.
      - Selected patient profile card displaying age, gender, UHID, and a prominent **Red Allergy Alert Pill** if confirmed allergies are on file.
-     - 1-click patient switching with immediate context sync across dictation and chat panels.
-   - **Clinical Dictation Workspace (Center Pane - `DictationWorkspace.tsx`)**:
-     - Native tactile Mic button powered by the browser `MediaRecorder` API.
+     - 1-click patient switching with immediate context sync and draft reset.
+   - **Clinical Voice Recorder & Real-Time Waveform Equalizer (`DictationWorkspace.tsx`)**:
+     - Native tactile Mic button powered by browser `MediaRecorder` API.
      - **Industrial On-Demand Microphone Lifecycle & Instant Hardware Teardown**:
        - Strictly opens microphone hardware (`getUserMedia({ audio: true })`) ONLY when the doctor initiates recording. Never captures in the background or during idle states.
-       - Immediate teardown on `stop`, `discard`, patient switch, tab change, or component unmount: terminates all tracks (`track.stop()`, `track.enabled = false`), disconnects `MediaStreamAudioSourceNode` and `AnalyserNode`, and closes `AudioContext`, immediately extinguishing browser and OS microphone recording indicators.
-       - Unified 1-click recording flow: clicking the microphone button directly prompts the native browser permission dialog if not yet granted, and seamlessly begins recording upon approval.
+       - Immediate teardown on `stop`, `discard`, patient switch, or unmount: terminates all tracks (`track.stop()`, `track.enabled = false`), disconnects `MediaStreamAudioSourceNode` and `AnalyserNode`, and closes `AudioContext`, immediately extinguishing browser and OS microphone recording indicators.
+       - Unified 1-click recording flow: clicking the microphone button directly prompts native browser permission dialog if not yet granted, and begins recording upon approval.
        - If microphone access was previously blocked in browser policy, displays high-density address-bar unblock instructions with a dedicated **Re-check & Test Microphone** recovery tool.
-     - **Pristine Medical Soundwave Equalizer & Real-Time Decibel Meter (`DictationWorkspace.tsx`)**:
+     - **Pristine Medical Soundwave Equalizer & Real-Time Decibel Meter**:
        - High-definition mirrored equalizer canvas (`AudioContext`, `AnalyserNode`) rendering 42 smooth rounded pill capsules (`roundRect`) inside a pristine clinical viewport (`bg-white border-slate-200` on `bg-slate-50/50`).
-       - Gradient fill (`#2563EB` Royal Blue to `#60A5FA` Sky Blue) with soft glow and gentle sinusoidal wave modulation (`idlePulse`) keeping the canvas organically alive.
+       - Gradient fill (`#2563EB` Royal Blue to `#60A5FA` Sky Blue) with soft glow.
        - Live Voice Activity RMS Meter with real-time status badge: green pulsating beacon for `Voice Detected (X%)` vs slate beacon for `Listening for doctor...`.
-       - Tactile secondary **Discard Note** button (`Trash2`) allowing clinicians to reset accidental recordings without initiating an unwanted AI pipeline roundtrip.
-       - Primary **Done & Extract Record** action button (`bg-[#2563EB]`) adhering to Anti-Slop single accent standards.
-       - Dynamic AI Reasoning Pipeline card with animated sparkles radar, stepped progress indicators, and prominent HITL medical safety reassurance.
-       - Fluid tab-switching between Voice Dictation and Copilot Assistant Chat (`transition-all duration-200 animate-in fade-in-50`).
-       - Animated slide-up entrance for newly extracted drafts (`animate-in fade-in-50 slide-in-from-bottom-2 duration-300 ease-out`).
-       - Compact high-density queue cards with active selection ring (`ring-1 ring-[#2563EB]/20 bg-blue-50/90`) and tactile press feedback (`active:scale-[0.99]`).
-       - Interactive table rows with subtle hover transitions (`hover:bg-slate-50/70`) and tactile action buttons (`active:scale-95 duration-150`).
-     - 3-minute safety limit countdown timer with automatic graceful stop.
-     - Hinglish/English sample clinical note loader for rapid development testing.
-     - Side-by-side editable **Draft Prescription Card** (`DraftPrescriptionCard.tsx`) and **Draft Invoice Card** (`DraftInvoiceCard.tsx`).
+       - Secondary **Discard Note** button (`Trash2`) and primary **Done & Extract Record** button (`bg-[#2563EB]`).
+       - Expandable/collapsible mode: renders as a compact status bar during active consultation with quick **Record Voice Note** trigger.
+   - **Encounter Timeline & Extracted Draft Cards**:
+     - Inline conversational timeline displaying user voice/text events, assistant streaming tokens, and interactive Action Cards (`BLOCK_SLOT` and `BOOK_FOLLOWUP`).
+     - Side-by-side or stacked editable **Draft Prescription Card** (`DraftPrescriptionCard.tsx`) and **Draft Invoice Card** (`DraftInvoiceCard.tsx`).
      - Interactive `RxPrintModal.tsx` for clean A4 letterhead printing before or after sign-off.
      - **Sticky Action Bar** with role-aware buttons: Save Draft, Print/Preview Rx, and Finalize/Approve.
-   - **Assistant Chat Rail (Right Pane - `CopilotChatWorkspace.tsx`)**:
-     - Context-aware streaming assistant pre-loaded with today's OPD appointments, doctor schedule, and active patient profile.
-     - Streams typed NDJSON events (`status`, `token`, `action_card`, `done`) with live token generation.
-     - Starter prompt chips (`Block my next 2 hours`, `Book follow-up next week`, `Show available slots tomorrow`).
-     - Interactive, non-destructive Action Cards for slot blocking (`BLOCK_SLOT_CARD`) and follow-up booking (`BOOK_FOLLOWUP_CARD`).
+     - Zero AI model jargon: completely sanitized of internal model names (`Gemini 3.5`, `Multimodal`) in favor of hospital-grade clinical CRM terms.
 
 2. **Multimodal Audio / Transcript Ingestion Pipeline**:
    - Audio is transmitted as `multipart/form-data` (validated <= 10MB) to `/api/crm/copilot/dictate` or raw text via JSON.
