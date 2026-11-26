@@ -15,6 +15,7 @@ import { GeminiProvider } from "./providers/gemini-provider";
 import { ModelRouter, type AiTaskType } from "./model-router";
 import { validateAiInput, applyPatientSafetyGuardrail, type AiChannel } from "./guardrails";
 import { recordAiAudit } from "./telemetry";
+import { env } from "@/lib/env";
 
 export interface LlmCallOptions {
   organizationId: string;
@@ -107,6 +108,8 @@ export class LlmClient {
     // 2. Model Routing
     const resolution = ModelRouter.resolveModelForTask(options.task);
     const startMs = Date.now();
+    const totalTimeout = options.timeoutMs || env.AI_REQUEST_TIMEOUT_MS;
+    const primaryTimeout = Math.min(totalTimeout, 22000);
     let fallbackUsed = false;
 
     try {
@@ -117,19 +120,20 @@ export class LlmClient {
           systemPrompt: options.systemPrompt,
           userPrompt: options.userPrompt,
           temperature: options.temperature,
-          timeoutMs: options.timeoutMs,
+          timeoutMs: primaryTimeout,
           signal: options.signal,
         });
       } catch (err: any) {
         // Fallback retry if primary fails with transient error, timeout, or model overload
         if (isEligibleForFallback(err)) {
           fallbackUsed = true;
+          const remainingTimeout = Math.max(15000, totalTimeout - (Date.now() - startMs));
           res = await this.provider.generateText({
             model: resolution.fallbackModel,
             systemPrompt: options.systemPrompt,
             userPrompt: options.userPrompt,
             temperature: options.temperature,
-            timeoutMs: options.timeoutMs,
+            timeoutMs: remainingTimeout,
             signal: options.signal,
           });
         } else {
@@ -210,6 +214,8 @@ export class LlmClient {
     // 2. Model Routing
     const resolution = ModelRouter.resolveModelForTask(options.task);
     const startMs = Date.now();
+    const totalTimeout = options.timeoutMs || env.AI_REQUEST_TIMEOUT_MS;
+    const primaryTimeout = Math.min(totalTimeout, 22000);
     let fallbackUsed = false;
 
     try {
@@ -221,7 +227,7 @@ export class LlmClient {
             systemPrompt: options.systemPrompt,
             userPrompt: options.userPrompt,
             temperature: options.temperature,
-            timeoutMs: options.timeoutMs,
+            timeoutMs: primaryTimeout,
             signal: options.signal,
           },
           schema
@@ -229,13 +235,14 @@ export class LlmClient {
       } catch (err: any) {
         if (isEligibleForFallback(err)) {
           fallbackUsed = true;
+          const remainingTimeout = Math.max(15000, totalTimeout - (Date.now() - startMs));
           res = await this.provider.generateStructured(
             {
               model: resolution.fallbackModel,
               systemPrompt: options.systemPrompt,
               userPrompt: options.userPrompt,
               temperature: options.temperature,
-              timeoutMs: options.timeoutMs,
+              timeoutMs: remainingTimeout,
               signal: options.signal,
             },
             schema
@@ -294,6 +301,8 @@ export class LlmClient {
     const channel = options.channel || "WEB_COPILOT";
     const resolution = ModelRouter.resolveModelForTask(options.task);
     const startMs = Date.now();
+    const totalTimeout = options.timeoutMs || env.AI_REQUEST_TIMEOUT_MS;
+    const primaryTimeout = Math.min(totalTimeout, 22000);
     let fallbackUsed = false;
 
     try {
@@ -307,7 +316,7 @@ export class LlmClient {
             systemPrompt: options.systemPrompt,
             userPrompt: options.userPrompt,
             temperature: options.temperature,
-            timeoutMs: options.timeoutMs,
+            timeoutMs: primaryTimeout,
             signal: options.signal,
           },
           schema
@@ -315,6 +324,7 @@ export class LlmClient {
       } catch (err: any) {
         if (isEligibleForFallback(err)) {
           fallbackUsed = true;
+          const remainingTimeout = Math.max(15000, totalTimeout - (Date.now() - startMs));
           res = await this.provider.generateStructuredFromAudio(
             {
               model: resolution.fallbackModel,
@@ -323,7 +333,7 @@ export class LlmClient {
               systemPrompt: options.systemPrompt,
               userPrompt: options.userPrompt,
               temperature: options.temperature,
-              timeoutMs: options.timeoutMs,
+              timeoutMs: remainingTimeout,
               signal: options.signal,
             },
             schema
