@@ -204,6 +204,10 @@ Outpatient appointments with concurrency locking and write idempotency.
 - **`invoices`**: `id`, `organizationId` (FK, Indexed), `branchId` (FK), `patientId` (FK), `appointmentId` (nullable FK -> appointments.id), `billerId` (FK), `invoiceNumber` (UNIQUE), `status` (ENUM: `DRAFT`, `ISSUED`, `PAID`, `VOID`, default: 'ISSUED'), `invoiceType`, `items` (JSONB), `subtotal`, `taxTotal`, `discountTotal`, `grandTotal`, `amountPaid`, `balanceDue`, `paymentStatus`.
 - **`payments`**: `id`, `organizationId` (FK, Indexed), `receiptNumber`, `invoiceId` (FK), `patientId` (FK), `collectedBy`, `amount`, `paymentMode`.
 
+### 11. `print_settings` (`db/schema/print-settings.ts`)
+- **`print_settings`**: `id` (UUID PK), `organizationId` (UUID FK -> organizations.id, Indexed), `templateType` (TEXT: `opd_treatment`, `opd_case_paper`, `opd_consent_form`, `ipd_document`, `ipd_treatment`, `ipd_initial_assessment`, `lab_order`, `opd_billing`, `thermal_print`), `title`, `pageSize` (`A4`, `A5`, `3in`), `marginTop`, `marginBottom`, `marginLeft`, `marginRight` (Inches), `columnType` (`single`, `double`), `columnWidth` (10-100%), `fontSize` (8-15 pt), `lineSpacing` (0-10 pt), `fontFamily`, `displayHeader`, `displayFooter`, `includeLogo`, `displayDoctorDetails`, `displaySignature`, `patientKinSignature`, `displayBarcode`, `displayDateTime`, `displayVitals`, `displayPatientDetailsInColumns`, `headerHeight`, `headerImageUrl`, `footerImageUrl`, `footerText`, `billHeader`, `receiptHeader`, `depositHeader`, `refundHeader`, `displayOperatorName`, `displayHsnCode`, `displayGstNumber`, `hsnCodeLabel`, `printOrderJson` (JSONB), `visibleFieldsJson` (JSONB), `customConfigJson` (JSONB), `createdAt`, `updatedAt`.
+- **Unique Compound Index**: `print_settings_org_template_uidx` on (`organization_id`, `template_type`) ensures at most one customized configuration per template per clinic tenant.
+
 ---
 
 ## 3. Concurrency & Integrity Invariants

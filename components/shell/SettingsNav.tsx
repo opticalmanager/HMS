@@ -53,10 +53,18 @@ export const SETTINGS_TABS: SettingsTabItem[] = [
     description: "Team members, roles, invitations & permissions",
   },
   {
-    id: "letterhead",
-    label: "Letterhead & Print",
-    href: "/settings",
+    id: "printouts",
+    label: "Printout Templates",
+    href: "/settings/printouts",
     icon: Printer,
+    description: "OPD, IPD, Billing & Thermal print layouts & page setup",
+    badge: "Engine",
+  },
+  {
+    id: "letterhead",
+    label: "Letterhead & Sequences",
+    href: "/settings",
+    icon: Settings,
     description: "Branding, letterhead designer & document sequences",
   },
 ];

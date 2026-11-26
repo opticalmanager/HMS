@@ -36,6 +36,8 @@ import { UploadAttachmentModal } from "@/components/opd/UploadAttachmentModal";
 import { QuickPatientRegistrationModal } from "@/components/appointments/QuickPatientRegistrationModal";
 import { AppointmentBookingModal } from "@/components/appointments/AppointmentBookingModal";
 import { PrescriptionPrintModal } from "@/components/clinical/PrescriptionPrintModal";
+import { UniversalPrintModal } from "@/components/print/UniversalPrintModal";
+import type { PrintTemplateType } from "@/db/schema/print-settings";
 
 import { useClinicalStore, clinicalStore } from "@/services/clinical-store";
 import type { Appointment, Patient, VitalRecord, DiagnosisEntry, PrescriptionItem } from "@/types/hms";
@@ -64,6 +66,8 @@ export default function OpdPage() {
   const [addPatientModalOpen, setAddPatientModalOpen] = React.useState(false);
   const [bookingModalOpen, setBookingModalOpen] = React.useState(false);
   const [printRxModalOpen, setPrintRxModalOpen] = React.useState(false);
+  const [printUniversalModalOpen, setPrintUniversalModalOpen] = React.useState(false);
+  const [printOpdTemplate, setPrintOpdTemplate] = React.useState<PrintTemplateType>("opd_treatment");
   const [moreMenuOpen, setMoreMenuOpen] = React.useState(false);
   const [infoPopoverOpen, setInfoPopoverOpen] = React.useState(false);
 
@@ -343,11 +347,44 @@ export default function OpdPage() {
                 onClick={() => setMoreMenuOpen(false)}
               >
                 <button
-                  onClick={() => setPrintRxModalOpen(true)}
+                  onClick={() => {
+                    setPrintOpdTemplate("opd_treatment");
+                    setPrintUniversalModalOpen(true);
+                  }}
+                  className="w-full text-left px-3 py-1.5 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
+                >
+                  <Printer className="h-3.5 w-3.5 text-[#2563EB]" />
+                  <span className="font-medium">Print Treatment Rx</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setPrintOpdTemplate("opd_case_paper");
+                    setPrintUniversalModalOpen(true);
+                  }}
                   className="w-full text-left px-3 py-1.5 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
                 >
                   <Printer className="h-3.5 w-3.5 text-slate-600" />
-                  <span>Print Prescription (A4)</span>
+                  <span>Print OPD Case Paper</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setPrintOpdTemplate("opd_consent_form");
+                    setPrintUniversalModalOpen(true);
+                  }}
+                  className="w-full text-left px-3 py-1.5 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
+                >
+                  <Printer className="h-3.5 w-3.5 text-slate-600" />
+                  <span>Print Consent Form</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setPrintOpdTemplate("lab_order");
+                    setPrintUniversalModalOpen(true);
+                  }}
+                  className="w-full text-left px-3 py-1.5 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
+                >
+                  <Printer className="h-3.5 w-3.5 text-slate-600" />
+                  <span>Print Lab / Order Slip</span>
                 </button>
                 <button
                   onClick={() => setUploadModalOpen(true)}
@@ -501,6 +538,28 @@ export default function OpdPage() {
         vitals={defaultVitals}
         clinicalNotes={selectedAppointment.notes || "Visual Acuity: OD 6/6, OS 6/6"}
         settings={store.settings}
+      />
+
+      {/* 10. Universal Healthray Print Engine Modal */}
+      <UniversalPrintModal
+        open={printUniversalModalOpen}
+        onOpenChange={setPrintUniversalModalOpen}
+        templateType={printOpdTemplate}
+        title={`OPD Document - ${selectedAppointment.patientName}`}
+        data={{
+          patientName: selectedAppointment.patientName,
+          uhid: selectedAppointment.patientUhid || selectedAppointment.patientId,
+          phone: selectedAppointment.patientPhone,
+          doctorName: selectedAppointment.doctorName,
+          date: selectedAppointment.appointmentDate,
+          time: selectedAppointment.timeSlot,
+        }}
+        availableTemplates={[
+          { id: "opd_treatment", label: "OPD Treatment (Rx)" },
+          { id: "opd_case_paper", label: "OPD Case Paper" },
+          { id: "opd_consent_form", label: "Consent Form" },
+          { id: "lab_order", label: "Lab / Order" },
+        ]}
       />
     </div>
   );

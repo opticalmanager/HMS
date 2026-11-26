@@ -144,7 +144,7 @@ export default function SettingsPage() {
       />
 
       {/* Operational Settings Hub (Quick Navigation Grid) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
         <Link
           href="/settings/clinic"
           className="group p-3.5 rounded-lg border border-slate-200 bg-white hover:border-blue-400 hover:shadow-xs transition-all text-left flex flex-col justify-between"
@@ -238,6 +238,33 @@ export default function SettingsPage() {
           <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400">
             <span>Access Control</span>
             <span className="font-semibold text-amber-600">Manage &rarr;</span>
+          </div>
+        </Link>
+
+        <Link
+          href="/settings/printouts"
+          className="group p-3.5 rounded-lg border border-blue-200 bg-blue-50/30 hover:border-blue-500 hover:shadow-xs transition-all text-left flex flex-col justify-between"
+        >
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <div className="h-8 w-8 rounded-md bg-blue-100 text-[#2563EB] flex items-center justify-center group-hover:bg-[#2563EB] group-hover:text-white transition-colors">
+                <Printer className="h-4 w-4" />
+              </div>
+              <ArrowUpRight className="h-3.5 w-3.5 text-blue-400 group-hover:text-[#2563EB] transition-colors" />
+            </div>
+            <div className="flex items-center gap-1.5">
+              <h3 className="text-xs font-bold text-slate-900 group-hover:text-[#2563EB] transition-colors">
+                Printout Templates
+              </h3>
+              <Badge variant="outline" className="text-[9px] bg-blue-100 text-blue-700 px-1 py-0">New</Badge>
+            </div>
+            <p className="text-[11px] text-slate-500 mt-1 line-clamp-2">
+              OPD, IPD, Billing & Thermal print formats, margins & live setup.
+            </p>
+          </div>
+          <div className="mt-3 pt-2 border-t border-blue-100 flex items-center justify-between text-[10px] text-blue-600">
+            <span>Healthray Engine</span>
+            <span className="font-semibold text-blue-700">Open Studio &rarr;</span>
           </div>
         </Link>
       </div>

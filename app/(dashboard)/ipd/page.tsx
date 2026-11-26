@@ -13,6 +13,7 @@ import {
   UserCheck,
   Clock,
   Sparkles,
+  Printer,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,10 +23,12 @@ import { Badge } from "@/components/ui/badge";
 import { BedGridVisualizer } from "@/components/ipd/BedGridVisualizer";
 import { BedAllocationModal } from "@/components/ipd/BedAllocationModal";
 import { DischargeSummaryModal } from "@/components/ipd/DischargeSummaryModal";
+import { UniversalPrintModal } from "@/components/print/UniversalPrintModal";
 import { useClinicalStore, clinicalStore } from "@/services/clinical-store";
 import { IpdService } from "@/services/ipd.service";
 import { formatCurrencyINR, formatClinicalDate } from "@/utils/formatting";
 import type { Bed, IpdAdmission } from "@/types/hms";
+import type { PrintTemplateType } from "@/db/schema/print-settings";
 
 export default function IpdPage() {
   const store = useClinicalStore();
@@ -43,6 +46,8 @@ export default function IpdPage() {
   const [selectedAdmissionForDischarge, setSelectedAdmissionForDischarge] = React.useState<IpdAdmission | null>(null);
 
   const [marShiftFilter, setMarShiftFilter] = React.useState<string>("all");
+  const [printModalOpen, setPrintModalOpen] = React.useState<boolean>(false);
+  const [printTemplate, setPrintTemplate] = React.useState<PrintTemplateType>("ipd_document");
 
   const stats = React.useMemo(() => IpdService.calculateOccupancy(bedsList), [bedsList]);
 
@@ -90,6 +95,18 @@ export default function IpdPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              setPrintTemplate("ipd_document");
+              setPrintModalOpen(true);
+            }}
+            className="text-xs gap-1.5 border-slate-300 text-slate-700 hover:bg-slate-50 cursor-pointer"
+          >
+            <Printer className="h-3.5 w-3.5 text-slate-600" /> Print Inpatient Records
+          </Button>
+
           <Button
             size="sm"
             onClick={() => {
@@ -350,6 +367,19 @@ export default function IpdPage() {
         open={dischargeModalOpen}
         onOpenChange={setDischargeModalOpen}
         admission={selectedAdmissionForDischarge}
+      />
+
+      {/* Universal Inpatient Print Engine Modal */}
+      <UniversalPrintModal
+        open={printModalOpen}
+        onOpenChange={setPrintModalOpen}
+        templateType={printTemplate}
+        title="Inpatient Clinical Document"
+        availableTemplates={[
+          { id: "ipd_document", label: "Discharge Summary" },
+          { id: "ipd_initial_assessment", label: "Initial Assessment" },
+          { id: "ipd_treatment", label: "Medication Chart" },
+        ]}
       />
     </div>
   );

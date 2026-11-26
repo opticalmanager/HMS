@@ -89,6 +89,11 @@
  * GLOBAL PRINT STYLES: Layout unconstraining for A4 Letterheads & 80mm Thermal Slips
  * ============================================================================== */
 @media print {
+  @page {
+    margin: 0;
+    size: auto;
+  }
+
   html,
   body {
     height: auto !important;

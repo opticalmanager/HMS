@@ -115,3 +115,19 @@ Clinical environments differ fundamentally from consumer web apps. Doctors, tria
 2. **Industrial Enter-as-Tab Navigation**: High-speed keyboard data entry replicating POS systems allowing staff to fill forms without touching the mouse.
 3. **Zero-Latency Lookups**: Instant autocomplete for ICD-10 diagnosis codes and pg_trgm fuzzy matching on clinic formulary.
 4. **Resilient Offline Fallback**: Caches records in Dexie.js (IndexedDB) and validates offline sessions via HMAC-SHA256 signatures.
+
+---
+
+## 8. Healthray Printout Engine & Multi-Channel Document Studio
+
+1. **Dedicated Studio (`/settings/printouts` or `/settings/print`)**:
+   - Covers 9 standardized clinical print templates: `opd_treatment`, `opd_case_paper`, `opd_consent_form`, `ipd_document`, `ipd_treatment`, `ipd_initial_assessment`, `lab_order`, `opd_billing`, and `thermal_print`.
+   - Complete page setup controls: Margins (0-2in), single/double column split, typography (8-15 pt font size, 0-10 pt line spacing, multi-font support), header/footer branding, logo, doctor signature, and official stamp.
+   - Field reordering dialog with visibility toggles (`PrintOrderModal`) matching Healthray's print order configurator.
+   - Live interactive paper canvas preview (50% to 150% zoom) with instant 1-click test printing.
+2. **End-to-End Clinical Module Integration**:
+   - **Doctor AI Copilot (`/dashboard/copilot`)**: 1-click dual printing for OPD Treatment (Rx) and OPD Case Paper.
+   - **OPD Clinical Console (`/opd`)**: 1-click generation of Prescriptions, Case Papers, Consent Forms, and Lab Requisitions.
+   - **IPD Wards (`/ipd`)**: 1-click generation of Inpatient Discharge Summaries, Initial Nursing Assessments, and Medication Charts.
+   - **Billing & POS (`/billing`)**: 1-click toggle between 80mm Thermal Receipts and A4 Tax Invoices.
+   - **Print Isolation**: High-density `@media print` rules, unconstrained dialog viewports, and page-break utilities.

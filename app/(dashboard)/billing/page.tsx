@@ -165,9 +165,10 @@ export default function BillingPage() {
                         size="sm"
                         variant="outline"
                         onClick={() => handleOpenThermal(inv)}
-                        className="h-7 text-xs gap-1"
+                        className="h-7 text-xs gap-1 border-slate-300 text-slate-700 hover:bg-slate-50 cursor-pointer"
+                        title="Print A4 Tax Invoice or 80mm Thermal Receipt"
                       >
-                        <Printer className="h-3 w-3" /> 80mm
+                        <Printer className="h-3 w-3 text-blue-600" /> Print
                       </Button>
                     </TableCell>
                   </TableRow>

@@ -245,3 +245,27 @@ The **Doctor AI Copilot** is a high-density, multi-tenant clinical workspace des
    - Doctor confirms block after reviewing conflicts.
    - Block is persisted in `doctor_slot_blocks`.
    - If `notifyAffectedPatients: true`, `appointment.reschedule_needed` events are enqueued in `webhook_outbox` for each impacted patient.
+
+---
+
+### 5. Healthray-Compatible Printout Templates & Dynamic Print Engine
+1. **Dedicated Settings Studio (`/settings/printouts` or `/settings/print`)**:
+   - Covers 9 core clinical templates:
+     - `opd_treatment`: OPD Treatment (Prescription) with Chief Complaints, Vitals, Diagnosis, Rx table, and Investigations.
+     - `opd_case_paper`: Full clinical encounter case record with systemic exam findings, history, and differential diagnosis.
+     - `opd_consent_form`: Procedural medical consent form with patient/relative declaration clauses and dual signature lines.
+     - `ipd_document`: Inpatient discharge summary with hospital course, admission diagnosis, and discharge medications.
+     - `ipd_treatment`: Inpatient MAR medication administration record chart with nursing dosage time slots (08:00, 14:00, 20:00, 02:00).
+     - `ipd_initial_assessment`: Nursing triage assessment with Morse fall risk and Braden skin integrity scores.
+     - `lab_order`: Diagnostic and pathology requisition with tube types, barcode identifiers, and phlebotomy notes.
+     - `opd_billing`: A4 final tax invoice with HSN/SAC codes, itemized charges, discount totals, and GST breakdown.
+     - `thermal_print`: 80mm ESC/POS compact monochrome receipt layout for counter thermal printers.
+   - Live Page Setup Controls: Margins (0 - 2.0 inches), single vs double column split with live proportional Column Width percentage slider (10% - 90%), typography (8-15 pt font size, 0-10 pt line spacing), header image height dropdown (0.75 - 2.5 inches), header/footer branding toggles, clinic logo, doctor signature, barcode, and official verified stamp.
+   - Field Reordering Modal (`PrintOrderModal`): Drag and drop or button-based section reordering and visibility toggles matching Healthray's print order configurator, directly respected by `PrintoutEngine`.
+   - Live Paper Canvas Preview: Realistic A4, A5, and 80mm viewports with zoom controls (50% to 150%), dynamic page indicator badges (e.g. `Page 1 of 1 • A4 (210×297mm)`), and instant 1-click test printing.
+2. **In-App Integration Across Core Modules**:
+   - **Doctor AI Copilot (`/dashboard/copilot`)**: Upgraded `RxPrintModal` supports 1-click switching between OPD Treatment (Rx) and OPD Case Paper with direct layout settings link and unconstrained print styles.
+   - **OPD Clinical Console (`/opd`)**: Actions dropdown provides 1-click generation of OPD Treatment, OPD Case Paper, Consent Form, and Lab Requisition.
+   - **IPD Wards (`/ipd`)**: Inpatient records toolbar allows 1-click generation of Discharge Summaries, Initial Nursing Assessments, and Medication Charts.
+   - **Billing & POS (`/billing`)**: `ThermalReceiptModal` provides 1-click toggle between 80mm Thermal Receipt and A4 Tax Bill with dynamic totals calculation from line items.
+   - **Print Isolation**: Strictly isolates document content via `print:hidden` on all workstation headers, sidebars, tabs, and zoom controls, while preserving custom margin padding and enforcing 1:1 print scaling with `print:transform-none`.

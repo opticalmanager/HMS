@@ -64,6 +64,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
     { label: "Doctor Schedules & Blocks", desc: "Weekly consultation shifts, slot durations & leave blocks", href: "/settings/schedules", icon: CalendarDays },
     { label: "Master Catalog & Tariffs", desc: "Prescription drug master (pg_trgm) & service pricing", href: "/settings/catalog", icon: BookOpen },
     { label: "Staff & Team Roles (RBAC)", desc: "Invite members, manage doctor/admin roles & permissions", href: "/settings/team", icon: Users },
+    { label: "Printout Templates & Layouts", desc: "OPD, IPD, Billing & Thermal print settings & live previews", href: "/settings/printouts", icon: Printer },
     { label: "System Settings & Letterhead", desc: "Hospital branding, letterhead designer & sequences", href: "/settings", icon: Settings },
   ];
 

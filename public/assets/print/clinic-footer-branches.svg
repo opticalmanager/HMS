@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 65" width="800" height="65" fill="none">
+  <!-- Top dividing border -->
+  <line x1="0" y1="2" x2="800" y2="2" stroke="#CBD5E1" stroke-width="1.2" />
+  
+  <!-- Column 1: New Delhi -->
+  <g transform="translate(10, 10)">
+    <text font-family="system-ui, sans-serif" font-size="8.5" font-weight="700" fill="#0F172A">New Delhi: Apex Center</text>
+    <text y="12" font-family="system-ui, sans-serif" font-size="7.5" fill="#475569">M-38, Ground Floor, Lajpat Nagar-II</text>
+    <text y="22" font-family="system-ui, sans-serif" font-size="7.5" fill="#475569">New Delhi - 110024</text>
+    <text y="32" font-family="system-ui, sans-serif" font-size="7.5" font-weight="600" fill="#2563EB">✆ +91 92050 40505</text>
+  </g>
+
+  <!-- Divider 1 -->
+  <line x1="200" y1="8" x2="200" y2="48" stroke="#E2E8F0" stroke-width="1" />
+
+  <!-- Column 2: Noida -->
+  <g transform="translate(215, 10)">
+    <text font-family="system-ui, sans-serif" font-size="8.5" font-weight="700" fill="#0F172A">Noida: Apex Heights</text>
+    <text y="12" font-family="system-ui, sans-serif" font-size="7.5" fill="#475569">1st Floor, Plot C-36, Sector 20</text>
+    <text y="22" font-family="system-ui, sans-serif" font-size="7.5" fill="#475569">Gautam Buddha Nagar - 201301</text>
+    <text y="32" font-family="system-ui, sans-serif" font-size="7.5" font-weight="600" fill="#2563EB">✆ +91 92052 40505</text>
+  </g>
+
+  <!-- Divider 2 -->
+  <line x1="400" y1="8" x2="400" y2="48" stroke="#E2E8F0" stroke-width="1" />
+
+  <!-- Column 3: Bihar / Patna -->
+  <g transform="translate(415, 10)">
+    <text font-family="system-ui, sans-serif" font-size="8.5" font-weight="700" fill="#0F172A">Patna: Apex Health Hub</text>
+    <text y="12" font-family="system-ui, sans-serif" font-size="7.5" fill="#475569">East Boring Canal Road, Harikripa</text>
+    <text y="22" font-family="system-ui, sans-serif" font-size="7.5" fill="#475569">Patna, Bihar - 800001</text>
+    <text y="32" font-family="system-ui, sans-serif" font-size="7.5" font-weight="600" fill="#2563EB">✆ +91 84098 84505</text>
+  </g>
+
+  <!-- Divider 3 -->
+  <line x1="600" y1="8" x2="600" y2="48" stroke="#E2E8F0" stroke-width="1" />
+
+  <!-- Column 4: Jharkhand / Ranchi -->
+  <g transform="translate(615, 10)">
+    <text font-family="system-ui, sans-serif" font-size="8.5" font-weight="700" fill="#0F172A">Ranchi: Apex Medicare</text>
+    <text y="12" font-family="system-ui, sans-serif" font-size="7.5" fill="#475569">2D Modi Tower, Circular Road</text>
+    <text y="22" font-family="system-ui, sans-serif" font-size="7.5" fill="#475569">Ranchi, Jharkhand - 834001</text>
+    <text y="32" font-family="system-ui, sans-serif" font-size="7.5" font-weight="600" fill="#2563EB">✆ +91 84098 84505</text>
+  </g>
+
+  <!-- Bottom Website & Clinical Disclaimer -->
+  <g transform="translate(10, 56)">
+    <text font-family="system-ui, sans-serif" font-size="7.5" font-weight="600" fill="#0F172A">🌐 www.apexhospital.in</text>
+  </g>
+  <g transform="translate(560, 56)">
+    <text font-family="system-ui, sans-serif" font-size="7" font-style="italic" fill="#64748B">Kindly correlate clinically. Not for medico-legal purpose.</text>
+  </g>
+</svg>

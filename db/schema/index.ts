@@ -24,6 +24,7 @@ export * from "./catalog";
 export * from "./prescriptions";
 export * from "./outbox";
 export * from "./ai-audit";
+export * from "./print-settings";
 
 import { relations } from "drizzle-orm";
 import { organizations } from "./organizations";
@@ -47,6 +48,7 @@ import { medicineMaster, serviceTariffs } from "./catalog";
 import { prescriptions } from "./prescriptions";
 import { webhookOutbox } from "./outbox";
 import { aiAuditLogs } from "./ai-audit";
+import { printSettings } from "./print-settings";
 
 // Organization Relations
 export const organizationsRelations = relations(organizations, ({ one, many }) => ({
@@ -67,6 +69,7 @@ export const organizationsRelations = relations(organizations, ({ one, many }) =
   prescriptions: many(prescriptions),
   outbox: many(webhookOutbox),
   aiAuditLogs: many(aiAuditLogs),
+  printSettings: many(printSettings),
 }));
 
 // Clinic Profile Relations
@@ -329,5 +332,13 @@ export const inventoryBatchesRelations = relations(inventoryBatches, ({ one }) =
   item: one(inventoryItems, {
     fields: [inventoryBatches.itemId],
     references: [inventoryItems.id],
+  }),
+}));
+
+// Print Settings Relations
+export const printSettingsRelations = relations(printSettings, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [printSettings.organizationId],
+    references: [organizations.id],
   }),
 }));

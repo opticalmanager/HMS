@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 60" width="240" height="60" fill="none">
+  <!-- Medical Cross / Shield / Heart Emblem -->
+  <rect x="4" y="6" width="48" height="48" rx="12" fill="#2563EB" />
+  <path d="M28 16v28M14 30h28" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" />
+  <circle cx="28" cy="30" r="16" stroke="#93C5FD" stroke-width="2" stroke-dasharray="3 3" />
+  <path d="M18 30h5l3-6 4 12 3-8 3 4h4" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+  <!-- Brand Typography -->
+  <text x="62" y="28" font-family="system-ui, -apple-system, sans-serif" font-size="19" font-weight="800" fill="#0F172A" letter-spacing="-0.5">APEX CLINIC</text>
+  <text x="62" y="44" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="600" fill="#2563EB" letter-spacing="1.2">MULTISPECIALITY HOSPITAL</text>
+  <text x="62" y="54" font-family="system-ui, -apple-system, sans-serif" font-size="8.5" font-weight="400" fill="#64748B">NABH ACCREDITED • REG: APX/2026/DL</text>
+</svg>

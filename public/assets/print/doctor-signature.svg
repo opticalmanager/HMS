@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 65" width="200" height="65" fill="none">
+  <!-- Smooth cursive calligraphy path for doctor signature -->
+  <path d="M15 45 C 22 25, 30 15, 42 22 C 55 30, 40 50, 60 38 C 75 28, 80 18, 92 25 C 105 32, 95 48, 115 35 C 128 26, 138 32, 148 28 C 160 24, 172 38, 185 22" 
+        stroke="#1E3A8A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <path d="M35 32 C 60 36, 120 40, 175 30" 
+        stroke="#1E3A8A" stroke-width="1.8" stroke-linecap="round" fill="none"/>
+  <path d="M110 42 C 125 45, 145 44, 160 41" 
+        stroke="#2563EB" stroke-width="1.2" stroke-linecap="round" stroke-dasharray="1 2"/>
+</svg>

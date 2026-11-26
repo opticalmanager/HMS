@@ -520,3 +520,21 @@ export function decryptBroadcastApiKey(cipherString: string): string;
   - `CONFIRM_BLOCK_SLOT`: `{ actionType: "CONFIRM_BLOCK_SLOT", doctorId, startAt, endAt, reason?, notifyAffectedPatients? }` (executes `dryRun: false`, blocks slots, and queues patient reschedule notices).
   - `CONFIRM_BOOK_FOLLOWUP`: `{ actionType: "CONFIRM_BOOK_FOLLOWUP", patientId, doctorId, appointmentDate, timeSlot, chiefComplaints? }` (atomically creates appointment).
 - **Response**: `{ success: true, message: "...", data: {...} }`
+
+### 30. `GET /api/crm/print-settings`
+- **Purpose**: Fetch print template configuration for the active clinic organization. Returns all 9 template configurations, or a single template if `?templateType=...` is specified. Falls back to clinic defaults if uncustomized.
+- **RBAC Requirement**: Authenticated clinic session via `requireClinicSession`.
+- **Query Params**: `templateType?` (`opd_treatment`, `opd_case_paper`, `opd_consent_form`, `ipd_document`, `ipd_treatment`, `ipd_initial_assessment`, `lab_order`, `opd_billing`, `thermal_print`)
+- **Response**: `{ success: true, clinicId, role, data: {...} }`
+
+### 31. `PUT /api/crm/print-settings`
+- **Purpose**: Upsert customized print settings (margins, column type, typography, header/footer branding, logo, barcode, signatures, print order, visible fields) for a specified template type.
+- **RBAC Requirement**: Authenticated clinic session with staff access.
+- **Payload**: `savePrintSettingsSchema` (`templateType`, `title?`, `pageSize?`, `marginTop?`, `marginBottom?`, `marginLeft?`, `marginRight?`, `columnType?`, `columnWidth?`, `fontSize?`, `lineSpacing?`, `fontFamily?`, `displayHeader?`, `displayFooter?`, `includeLogo?`, `displayDoctorDetails?`, `displaySignature?`, `patientKinSignature?`, `displayBarcode?`, `displayDateTime?`, `displayVitals?`, `displayPatientDetailsInColumns?`, `footerText?`, `printOrder?`, `visibleFields?`, `customConfig?`).
+- **Response**: `{ success: true, clinicId, role, data: {...} }`
+
+### 32. `DELETE /api/crm/print-settings`
+- **Purpose**: Reset a customized print template to factory defaults.
+- **RBAC Requirement**: Authenticated clinic session.
+- **Query Params**: `templateType` (required)
+- **Response**: `{ success: true, clinicId, role, data: {...} }` (returns default configuration)
