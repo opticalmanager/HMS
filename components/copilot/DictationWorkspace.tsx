@@ -126,7 +126,22 @@ export function DictationWorkspace({
     }
   }, []);
 
-  // Visualizer loop for live audio waveform (mirrored glowing equalized soundwave)
+  // Start or stop canvas visualizer reactively whenever isRecording state transitions
+  React.useEffect(() => {
+    if (isRecording) {
+      // Small frame tick ensures canvasRef is mounted and laid out in DOM
+      const raf = requestAnimationFrame(() => {
+        drawWaveform();
+      });
+      return () => cancelAnimationFrame(raf);
+    } else {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    }
+  }, [isRecording]);
+
+  // Visualizer loop for live audio waveform (mirrored light clinical soundwave)
   const drawWaveform = () => {
     if (!canvasRef.current || !analyserRef.current) return;
     const canvas = canvasRef.current;
@@ -150,7 +165,7 @@ export function DictationWorkspace({
       const avg = sum / bufferLength;
       const vol = Math.min(100, Math.round((avg / 255) * 100));
 
-      // Throttled volume state update for badge & ripple (10 fps)
+      // Throttled volume state update for badge (10 fps)
       frameCountRef.current++;
       if (frameCountRef.current % 6 === 0) {
         setAudioVolume(vol);
@@ -162,33 +177,32 @@ export function DictationWorkspace({
 
       ctx.clearRect(0, 0, width, height);
 
-      // Draw subtle centerline guide
-      ctx.strokeStyle = "rgba(148, 163, 184, 0.25)";
+      // Subtle Centerline guide
+      ctx.strokeStyle = "rgba(226, 232, 240, 0.85)"; // slate-200
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(12, centerY);
       ctx.lineTo(width - 12, centerY);
       ctx.stroke();
 
-      // Render 36 mirrored pill bars centered across the canvas
-      const barCount = 36;
-      const barWidth = 4;
-      const gap = 4;
+      // Render 42 mirrored pill bars centered across the canvas
+      const barCount = 42;
+      const barWidth = 3.5;
+      const gap = 3.5;
       const totalWidth = barCount * barWidth + (barCount - 1) * gap;
       const startX = Math.max(8, (width - totalWidth) / 2);
 
-      // Linear gradient for bars: sky blue -> primary blue
+      // Linear gradient for bars: Primary Royal Blue to Sky Blue
       const gradient = ctx.createLinearGradient(0, 0, 0, height);
-      gradient.addColorStop(0, "#38BDF8");
+      gradient.addColorStop(0, "#2563EB");
       gradient.addColorStop(0.5, "#60A5FA");
       gradient.addColorStop(1, "#2563EB");
 
       ctx.fillStyle = gradient;
-      ctx.shadowColor = "rgba(56, 189, 248, 0.45)";
-      ctx.shadowBlur = 6;
+      ctx.shadowColor = "rgba(37, 99, 235, 0.15)";
+      ctx.shadowBlur = 3;
 
       for (let i = 0; i < barCount; i++) {
-        // Sample frequency spectrum
         const binIndex = Math.min(
           bufferLength - 1,
           Math.floor((i / barCount) * (bufferLength * 0.8))
@@ -196,8 +210,8 @@ export function DictationWorkspace({
         const rawValue = dataArray[binIndex] || 0;
         const normalized = rawValue / 255;
 
-        // Subtle dynamic rhythmic wave modulation
-        const idlePulse = Math.sin(Date.now() / 250 + i * 0.35) * 1.5;
+        // Gentle organic breathing wave modulation so baseline is never dead
+        const idlePulse = Math.sin(Date.now() / 220 + i * 0.35) * 2;
         const barHeight = Math.max(6, normalized * (height - 14) + idlePulse);
 
         const x = startX + i * (barWidth + gap);
@@ -332,9 +346,6 @@ export function DictationWorkspace({
       setRecordingSeconds(0);
       setAudioVolume(0);
       frameCountRef.current = 0;
-
-      // Start waveform drawing
-      drawWaveform();
 
       // Countdown timer
       timerRef.current = setInterval(() => {
@@ -590,80 +601,75 @@ export function DictationWorkspace({
         <div className="flex flex-col items-center justify-center py-4 px-3 bg-slate-50/60 rounded-xl border border-slate-200/80 mb-3">
           {isRecording ? (
             <div className="flex flex-col items-center space-y-3.5 w-full max-w-xl animate-in fade-in-50 duration-200">
-              {/* Header: Live Volume Meter + Recording Timer */}
+              {/* Top Bar: Timer & Real-Time Voice Activity Status */}
               <div className="flex items-center justify-between w-full px-2">
-                {/* Voice Activity Indicator */}
-                <div className="flex items-center gap-1.5">
-                  {audioVolume > 10 ? (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs">
-                      <span className="relative flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-                      </span>
-                      Speaking Detected ({audioVolume}%)
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
-                      <span className="inline-block h-2 w-2 rounded-full bg-slate-400" />
-                      Listening (Speak into microphone)
-                    </span>
-                  )}
+                {/* Monospace Live Timer Badge */}
+                <div className="flex items-center gap-2">
+                  <span className="relative flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-600" />
+                  </span>
+                  <span className="font-mono text-xs font-bold text-slate-800 tabular-nums">
+                    {formatTimer(recordingSeconds)}
+                  </span>
+                  <span className="text-[11px] text-slate-400 font-medium">/ 3:00</span>
                 </div>
 
-                {/* Monospace Timer Badge */}
-                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold tabular-nums shadow-2xs">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-600" />
+                {/* Voice Volume Level Badge */}
+                <div className="flex items-center gap-1.5">
+                  <span
+                    className={cn(
+                      "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium border transition-all duration-200",
+                      audioVolume > 10
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-200 shadow-2xs"
+                        : "bg-slate-100 text-slate-500 border-slate-200"
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "h-1.5 w-1.5 rounded-full transition-colors",
+                        audioVolume > 10 ? "bg-emerald-500 animate-pulse" : "bg-slate-400"
+                      )}
+                    />
+                    {audioVolume > 10 ? `Voice Detected (${audioVolume}%)` : "Listening for doctor..."}
                   </span>
-                  <span>{formatTimer(recordingSeconds)}</span>
-                  <span className="text-rose-400 text-[10px]">/ 3:00</span>
                 </div>
               </div>
 
-              {/* High-Definition Mirrored Waveform Viewport */}
+              {/* Light Pristine Medical Waveform Canvas (Zero Black Box) */}
               <div className="w-full relative px-1">
-                <div className="relative rounded-xl overflow-hidden bg-slate-950 border border-slate-800 shadow-inner p-1.5">
+                <div className="relative rounded-xl overflow-hidden bg-white border border-slate-200 shadow-xs p-2">
                   <canvas
                     ref={canvasRef}
-                    width={480}
+                    width={520}
                     height={64}
-                    className="w-full h-16 block rounded-lg"
+                    className="w-full h-16 block rounded-lg bg-slate-50/50"
                   />
                 </div>
               </div>
 
-              {/* Action Buttons: Stop & Extract + Discard */}
-              <div className="flex items-center gap-3 pt-1">
+              {/* Action Buttons: Calm Secondary Discard + Primary Medical Done & Extract */}
+              <div className="flex items-center justify-between w-full pt-1 px-1">
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
                   onClick={discardRecording}
-                  className="h-9 px-3.5 rounded-full text-slate-600 border-slate-300 hover:text-rose-600 hover:border-rose-300 hover:bg-rose-50/70 active:scale-95 transition-all text-xs gap-1.5 cursor-pointer"
+                  className="h-9 px-3 text-slate-400 hover:text-rose-600 hover:bg-rose-50/80 text-xs font-medium gap-1.5 active:scale-95 transition-all cursor-pointer"
                   title="Discard this recording without processing"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                   Discard Note
                 </Button>
 
-                <div className="relative group">
-                  {/* Dynamic Glowing Volume Aura */}
-                  <div
-                    className="absolute -inset-1 rounded-full bg-rose-500/30 blur-xs transition-opacity duration-150"
-                    style={{
-                      opacity: Math.max(0.3, Math.min(1, 0.3 + (audioVolume / 100) * 0.7)),
-                    }}
-                  />
-                  <Button
-                    type="button"
-                    onClick={stopRecording}
-                    className="relative h-10 px-6 rounded-full bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs gap-2 shadow-md shadow-rose-600/30 active:scale-95 transition-all cursor-pointer"
-                  >
-                    <Square className="h-3.5 w-3.5 fill-current" />
-                    Stop & Extract Clinical Record
-                  </Button>
-                </div>
+                <Button
+                  type="button"
+                  onClick={stopRecording}
+                  className="h-10 px-6 rounded-full bg-[#2563EB] hover:bg-blue-700 text-white font-semibold text-xs gap-2 shadow-sm shadow-blue-500/20 active:scale-95 transition-all cursor-pointer"
+                >
+                  <Square className="h-3 w-3 fill-current" />
+                  Done & Extract Record
+                </Button>
               </div>
             </div>
           ) : isProcessing ? (
