@@ -155,21 +155,18 @@ The **Doctor AI Copilot** is a high-density, multi-tenant clinical workspace des
      - 1-click patient switching with immediate context sync across dictation and chat panels.
    - **Clinical Dictation Workspace (Center Pane - `DictationWorkspace.tsx`)**:
      - Native tactile Mic button powered by the browser `MediaRecorder` API.
-     - **Proactive Microphone Permission Lifecycle & Reactive Unlock Listener**:
-       - Proactively queries `navigator.permissions.query({ name: 'microphone' })` on mount with live `permissionStatus.onchange` listener.
-       - Features a high-visibility **Enable Microphone** prompt banner on first visit that directly invokes `getUserMedia()` upon user gesture to trigger the native browser permission dialog.
-       - Decouples microphone hardware access from patient selection: the mic button is never hard-disabled or greyed out, allowing audio testing and permission granting before a patient is selected.
-       - If attempted without an active patient, guides the clinician to select or register a walk-in patient from the left rail.
-       - If blocked/denied by browser policy (where browsers suppress native dialogs), displays a high-density, dismissible **Microphone Permission Required** card with 3-step address-bar unlock instructions.
-       - Includes quick-action **Re-check & Test Microphone** and 1-click **Use Text Note Fallback** to keep doctors unblocked.
-     - **Organic Mirrored Audio Waveform & Real-Time Decibel Meter (`DictationWorkspace.tsx`)**:
-       - High-definition mirrored equalizer canvas (`AudioContext`, `AnalyserNode`) rendering 36 smooth rounded pill capsules (`roundRect`) inside a dark glass viewport (`bg-slate-950 border-slate-800`).
-       - Gradient fill (`#38BDF8` cyan to `#2563EB` royal blue) with soft glow and gentle sinusoidal wave modulation (`idlePulse`) keeping the canvas organically alive.
-       - Live Voice Activity RMS Meter with real-time status badge: green pulsating beacon for `Speaking Detected (X%)` vs slate beacon for `Listening (Speak into microphone)`.
-       - Concentric glowing aura surrounding the primary Stop button that dynamically scales and breathes in sync with voice volume.
-       - Tactile **Discard Note** button (`Trash2`) allowing clinicians to reset and discard accidental recordings without initiating an unwanted AI pipeline roundtrip.
+     - **Industrial On-Demand Microphone Lifecycle & Instant Hardware Teardown**:
+       - Strictly opens microphone hardware (`getUserMedia({ audio: true })`) ONLY when the doctor initiates recording. Never captures in the background or during idle states.
+       - Immediate teardown on `stop`, `discard`, patient switch, tab change, or component unmount: terminates all tracks (`track.stop()`, `track.enabled = false`), disconnects `MediaStreamAudioSourceNode` and `AnalyserNode`, and closes `AudioContext`, immediately extinguishing browser and OS microphone recording indicators.
+       - Unified 1-click recording flow: clicking the microphone button directly prompts the native browser permission dialog if not yet granted, and seamlessly begins recording upon approval.
+       - If microphone access was previously blocked in browser policy, displays high-density address-bar unblock instructions with a dedicated **Re-check & Test Microphone** recovery tool.
+     - **Pristine Medical Soundwave Equalizer & Real-Time Decibel Meter (`DictationWorkspace.tsx`)**:
+       - High-definition mirrored equalizer canvas (`AudioContext`, `AnalyserNode`) rendering 42 smooth rounded pill capsules (`roundRect`) inside a pristine clinical viewport (`bg-white border-slate-200` on `bg-slate-50/50`).
+       - Gradient fill (`#2563EB` Royal Blue to `#60A5FA` Sky Blue) with soft glow and gentle sinusoidal wave modulation (`idlePulse`) keeping the canvas organically alive.
+       - Live Voice Activity RMS Meter with real-time status badge: green pulsating beacon for `Voice Detected (X%)` vs slate beacon for `Listening for doctor...`.
+       - Tactile secondary **Discard Note** button (`Trash2`) allowing clinicians to reset accidental recordings without initiating an unwanted AI pipeline roundtrip.
+       - Primary **Done & Extract Record** action button (`bg-[#2563EB]`) adhering to Anti-Slop single accent standards.
        - Dynamic AI Reasoning Pipeline card with animated sparkles radar, stepped progress indicators, and prominent HITL medical safety reassurance.
-     - **Smooth Workspace Transitions & Micro-Interactions**:
        - Fluid tab-switching between Voice Dictation and Copilot Assistant Chat (`transition-all duration-200 animate-in fade-in-50`).
        - Animated slide-up entrance for newly extracted drafts (`animate-in fade-in-50 slide-in-from-bottom-2 duration-300 ease-out`).
        - Compact high-density queue cards with active selection ring (`ring-1 ring-[#2563EB]/20 bg-blue-50/90`) and tactile press feedback (`active:scale-[0.99]`).
