@@ -12,7 +12,7 @@ const envSchema = z.object({
   GEMINI_API_KEY: z.string().optional(),
   AI_MODEL_FAST: z.string().default("gemini-3.5-flash-lite"),
   AI_MODEL_REASONING: z.string().default("gemini-3.5-flash"),
-  AI_REQUEST_TIMEOUT_MS: z.coerce.number().default(25000),
+  AI_REQUEST_TIMEOUT_MS: z.coerce.number().default(45000),
   INTERNAL_CRON_SECRET: z.string().optional(),
 });
 

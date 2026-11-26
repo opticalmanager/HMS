@@ -176,7 +176,8 @@ The **Doctor AI Copilot** is a high-density, multi-tenant clinical workspace des
 
 2. **Multimodal Audio / Transcript Ingestion Pipeline**:
    - Audio is transmitted as `multipart/form-data` (validated <= 10MB) to `/api/crm/copilot/dictate` or raw text via JSON.
-   - Processed by `DictationOrchestrator` using the dual-tier LLM engine (`gemini-3.5-flash` / `gemini-3.5-flash-lite`).
+   - Processed by `DictationOrchestrator` using the dual-tier LLM engine (routed to `gemini-3.5-flash-lite` by default for sub-2s execution, with seamless automatic fallback on 503 high demand, 429, or timeouts).
+   - Serverless API route configured with `export const maxDuration = 60` and 45s AI timeouts to prevent premature client aborts.
    - Structured JSON output conforms strictly to `DoctorDictationExtractionSchema` (`modules/ai/prompts/copilot-dictation.ts`).
 
 3. **Deterministic Salt-Level Allergy Safety Cross-Check**:

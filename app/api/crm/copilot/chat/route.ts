@@ -4,6 +4,8 @@ import { requireClinicSession, handleAuthError } from "@/lib/auth-guard";
 import { validateAiInput } from "@/modules/ai/guardrails";
 import { defaultChatOrchestrator, type CopilotStreamEvent } from "@/modules/ai/copilot/chat-orchestrator";
 
+export const maxDuration = 60;
+
 const chatSchema = z.object({
   message: z.string().min(1, "Message cannot be empty").max(2000, "Message exceeds limit"),
   patientId: z.string().uuid().optional().nullable(),

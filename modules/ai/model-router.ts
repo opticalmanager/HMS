@@ -22,6 +22,7 @@ const FAST_TASKS = new Set<AiTaskType>([
   "intent_classify",
   "slot_summary",
   "voice_turn",
+  "doctor_dictation_extract",
 ]);
 
 export class ModelRouter {

@@ -6,6 +6,8 @@ import { doctors } from "@/db/schema/doctors";
 import { requireClinicSession, handleAuthError, ForbiddenError } from "@/lib/auth-guard";
 import { defaultDictationOrchestrator } from "@/modules/ai/copilot/dictation-orchestrator";
 
+export const maxDuration = 60;
+
 const MAX_AUDIO_BYTES = 10 * 1024 * 1024; // 10 Megabytes
 
 const jsonDictateSchema = z.object({

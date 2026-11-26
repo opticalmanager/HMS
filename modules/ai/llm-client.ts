@@ -9,6 +9,7 @@ import {
   type GenerateFromAudioRequest,
   AiPromptBlockedError,
   AiRateLimitError,
+  AiTimeoutError,
 } from "./types";
 import { GeminiProvider } from "./providers/gemini-provider";
 import { ModelRouter, type AiTaskType } from "./model-router";
@@ -43,6 +44,26 @@ export interface LlmAudioCallOptions {
   temperature?: number;
   timeoutMs?: number;
   signal?: AbortSignal;
+}
+
+function isEligibleForFallback(err: any): boolean {
+  if (!err) return false;
+  if (err instanceof AiRateLimitError || err instanceof AiTimeoutError) return true;
+  const status = err?.status || err?.statusCode || err?.code;
+  if (status === 429 || status === 500 || status === 502 || status === 503 || status === 504) return true;
+  if (err?.code === "AI_RATE_LIMIT_EXCEEDED" || err?.code === "AI_REQUEST_TIMEOUT") return true;
+  const msg = String(err?.message || err).toLowerCase();
+  return (
+    msg.includes("rate limit") ||
+    msg.includes("resource_exhausted") ||
+    msg.includes("quota") ||
+    msg.includes("timed out") ||
+    msg.includes("timeout") ||
+    msg.includes("high demand") ||
+    msg.includes("overloaded") ||
+    msg.includes("unavailable") ||
+    msg.includes("503")
+  );
 }
 
 export class LlmClient {
@@ -100,8 +121,8 @@ export class LlmClient {
           signal: options.signal,
         });
       } catch (err: any) {
-        // Fallback retry if primary fails with transient error
-        if (err instanceof AiRateLimitError || err?.status === 500 || err?.status === 503 || err?.code === "AI_RATE_LIMIT_EXCEEDED") {
+        // Fallback retry if primary fails with transient error, timeout, or model overload
+        if (isEligibleForFallback(err)) {
           fallbackUsed = true;
           res = await this.provider.generateText({
             model: resolution.fallbackModel,
@@ -206,7 +227,7 @@ export class LlmClient {
           schema
         );
       } catch (err: any) {
-        if (err instanceof AiRateLimitError || err?.status === 500 || err?.status === 503 || err?.code === "AI_RATE_LIMIT_EXCEEDED") {
+        if (isEligibleForFallback(err)) {
           fallbackUsed = true;
           res = await this.provider.generateStructured(
             {
@@ -292,7 +313,7 @@ export class LlmClient {
           schema
         );
       } catch (err: any) {
-        if (err instanceof AiRateLimitError || err?.status === 500 || err?.status === 503 || err?.code === "AI_RATE_LIMIT_EXCEEDED") {
+        if (isEligibleForFallback(err)) {
           fallbackUsed = true;
           res = await this.provider.generateStructuredFromAudio(
             {

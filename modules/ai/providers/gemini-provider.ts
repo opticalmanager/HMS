@@ -75,7 +75,7 @@ export class GeminiProvider implements LLMProvider {
   private async executeWithRetry<T>(
     fn: () => Promise<T>,
     signal?: AbortSignal,
-    maxRetries = 3,
+    maxRetries = 1,
     initialDelayMs = 500
   ): Promise<T> {
     let delay = initialDelayMs;
