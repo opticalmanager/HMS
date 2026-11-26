@@ -3,7 +3,6 @@
 import * as React from "react";
 import {
   Mic,
-  MicOff,
   Square,
   Sparkles,
   Loader2,
@@ -23,6 +22,8 @@ interface DictationWorkspaceProps {
   onDictateText: (text: string) => Promise<void>;
   isProcessing: boolean;
   statusMessage?: string;
+  hasPatient?: boolean;
+  patientName?: string;
   disabled?: boolean;
 }
 
@@ -37,6 +38,8 @@ export function DictationWorkspace({
   onDictateText,
   isProcessing,
   statusMessage,
+  hasPatient = true,
+  patientName,
   disabled = false,
 }: DictationWorkspaceProps) {
   const [isRecording, setIsRecording] = React.useState(false);
@@ -51,6 +54,8 @@ export function DictationWorkspace({
   >("unknown");
   const [isRequestingPermission, setIsRequestingPermission] = React.useState(false);
   const [showPermissionHelp, setShowPermissionHelp] = React.useState(false);
+  const [showPermissionSuccess, setShowPermissionSuccess] = React.useState(false);
+  const [noPatientWarning, setNoPatientWarning] = React.useState(false);
 
   const mediaRecorderRef = React.useRef<MediaRecorder | null>(null);
   const audioChunksRef = React.useRef<Blob[]>([]);
@@ -91,6 +96,8 @@ export function DictationWorkspace({
           if (permissionStatus.state === "granted") {
             setMicError(null);
             setShowPermissionHelp(false);
+          } else if (permissionStatus.state === "denied") {
+            setShowPermissionHelp(true);
           }
 
           // Live reactive update when user toggles permission in browser address bar
@@ -99,6 +106,8 @@ export function DictationWorkspace({
             if (permissionStatus.state === "granted") {
               setMicError(null);
               setShowPermissionHelp(false);
+              setShowPermissionSuccess(true);
+              setTimeout(() => setShowPermissionSuccess(false), 4500);
             } else if (permissionStatus.state === "denied") {
               setMicError("Microphone permission was denied by the browser.");
               setShowPermissionHelp(true);
@@ -141,13 +150,59 @@ export function DictationWorkspace({
     render();
   };
 
+  // Direct user-gesture triggered permission request
+  const requestMicPermission = async () => {
+    setIsRequestingPermission(true);
+    setMicError(null);
+
+    try {
+      if (
+        typeof window !== "undefined" &&
+        !window.isSecureContext &&
+        window.location.hostname !== "localhost" &&
+        window.location.hostname !== "127.0.0.1"
+      ) {
+        throw new Error(
+          "Microphone recording requires a secure origin (HTTPS or localhost). Please access the clinic portal via HTTPS."
+        );
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // User clicked "Allow" in browser native popup!
+      stream.getTracks().forEach((track) => track.stop()); // close test hardware stream
+      setMicPermission("granted");
+      setShowPermissionHelp(false);
+      setShowPermissionSuccess(true);
+      setTimeout(() => setShowPermissionSuccess(false), 4500);
+      setNoPatientWarning(false);
+    } catch (err: any) {
+      const errName = err?.name || "";
+      const errMsg = err?.message || "";
+      if (
+        errName === "NotAllowedError" ||
+        errName === "PermissionDeniedError" ||
+        errMsg.toLowerCase().includes("permission denied")
+      ) {
+        setMicPermission("denied");
+        setShowPermissionHelp(true);
+      } else if (errName === "NotFoundError" || errName === "DevicesNotFoundError") {
+        setMicError("No microphone detected. Please plug in a microphone or headset.");
+      } else if (errName === "NotReadableError" || errName === "TrackStartError") {
+        setMicError("Microphone is locked by another application (e.g. Teams, Zoom, Discord).");
+      } else {
+        setMicError(errMsg || "Could not access microphone.");
+      }
+    } finally {
+      setIsRequestingPermission(false);
+    }
+  };
+
   const startRecording = async () => {
     setMicError(null);
     audioChunksRef.current = [];
     setIsRequestingPermission(true);
 
     try {
-      // Check for secure context
       if (
         typeof window !== "undefined" &&
         !window.isSecureContext &&
@@ -235,11 +290,11 @@ export function DictationWorkspace({
         setMicError("Microphone permission was denied by your browser.");
         setShowPermissionHelp(true);
       } else if (errName === "NotFoundError" || errName === "DevicesNotFoundError") {
-        setMicError("No microphone detected on this computer. Please plug in a microphone or headset.");
+        setMicError("No microphone detected. Please plug in a microphone or headset.");
       } else if (errName === "NotReadableError" || errName === "TrackStartError") {
-        setMicError("Microphone is currently locked by another application (e.g. Teams, Zoom, or Discord).");
+        setMicError("Microphone is currently locked by another application (e.g. Teams, Zoom, Discord).");
       } else {
-        setMicError(errMsg || "Could not access microphone. Please check browser permissions.");
+        setMicError(errMsg || "Could not access microphone.");
       }
     } finally {
       setIsRequestingPermission(false);
@@ -260,13 +315,33 @@ export function DictationWorkspace({
       return;
     }
 
-    // Always attempt recording on user gesture to trigger browser's native permission prompt
+    // 1. If mic permission has not yet been granted, request it directly via user gesture.
+    // This triggers the native browser "Allow / Block" popup immediately.
+    if (micPermission !== "granted") {
+      requestMicPermission();
+      return;
+    }
+
+    // 2. If mic is permitted, but no patient is selected, prompt clearly
+    if (!hasPatient) {
+      setNoPatientWarning(true);
+      setShowPermissionSuccess(true);
+      setTimeout(() => setShowPermissionSuccess(false), 4500);
+      return;
+    }
+
+    // 3. Permitted and patient selected -> start recording
+    setNoPatientWarning(false);
     startRecording();
   };
 
   const handleTextSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!textInput.trim() || isProcessing) return;
+    if (!hasPatient) {
+      setNoPatientWarning(true);
+      return;
+    }
     await onDictateText(textInput.trim());
   };
 
@@ -291,9 +366,16 @@ export function DictationWorkspace({
               <Sparkles className="h-4 w-4" />
             </div>
             <div>
-              <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
-                Native Clinical Voice Dictation (Gemini 3.5 Multimodal)
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
+                  Native Clinical Voice Dictation (Gemini 3.5 Multimodal)
+                </h2>
+                {hasPatient && patientName && (
+                  <span className="text-[10px] font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                    Active: {patientName}
+                  </span>
+                )}
+              </div>
               <p className="text-[11px] text-slate-500">
                 Dictate natural clinical notes in English or Hinglish. Automatically ground Rx & Bill.
               </p>
@@ -325,6 +407,86 @@ export function DictationWorkspace({
             </Button>
           </div>
         </div>
+
+        {/* =========================================================================
+            1. PROACTIVE PERMISSION BANNER (Shown when browser has not yet been granted permission)
+           ========================================================================= */}
+        {micPermission !== "granted" && micPermission !== "denied" && (
+          <div className="mb-3.5 p-3 rounded-xl bg-blue-50/90 border border-blue-200 text-slate-800 text-xs flex flex-wrap items-center justify-between gap-2 shadow-2xs">
+            <div className="flex items-center gap-2.5">
+              <div className="h-7 w-7 rounded-lg bg-[#2563EB] text-white flex items-center justify-center shrink-0">
+                <Mic className="h-3.5 w-3.5" />
+              </div>
+              <div>
+                <span className="font-bold text-blue-950 block text-xs">
+                  Microphone Permission Required
+                </span>
+                <span className="text-[11px] text-blue-800">
+                  Click &quot;Enable Microphone&quot; to prompt your browser to allow clinical voice recording.
+                </span>
+              </div>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              onClick={requestMicPermission}
+              disabled={isRequestingPermission}
+              className="h-7 px-3 text-xs bg-[#2563EB] hover:bg-blue-700 text-white font-medium gap-1.5 cursor-pointer shadow-2xs"
+            >
+              {isRequestingPermission ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <Mic className="h-3 w-3" />
+              )}
+              Enable Microphone
+            </Button>
+          </div>
+        )}
+
+        {/* =========================================================================
+            2. PERMISSION GRANTED CONFIRMATION (Temporary reassurance)
+           ========================================================================= */}
+        {showPermissionSuccess && (
+          <div className="mb-3.5 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs flex items-center justify-between gap-2 shadow-2xs">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+              <span className="font-medium">
+                Microphone permission is enabled &amp; active! {hasPatient ? `Ready to dictate for ${patientName}.` : "Select a patient on the left to begin consultation dictation."}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowPermissionSuccess(false)}
+              className="text-emerald-700 hover:text-emerald-950 text-xs cursor-pointer p-0.5"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
+
+        {/* =========================================================================
+            3. NO PATIENT WARNING BANNER (When doctor clicks mic without active patient)
+           ========================================================================= */}
+        {noPatientWarning && !hasPatient && (
+          <div className="mb-3.5 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-start justify-between gap-2 shadow-2xs">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold block">Patient Selection Required</span>
+                <span className="text-[11px] text-amber-800">
+                  Microphone is active! Please select a patient from today&apos;s queue on the left (or click <strong>&quot;+ Quick Register Walk-in&quot;</strong>) to attach this clinical consultation.
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setNoPatientWarning(false)}
+              className="text-amber-700 hover:text-amber-950 text-xs cursor-pointer p-0.5 shrink-0"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
 
         {/* Mic Visualizer / Record Hero Area */}
         <div className="flex flex-col items-center justify-center py-4 px-3 bg-slate-50/60 rounded-xl border border-slate-200/80 mb-3">
@@ -373,14 +535,22 @@ export function DictationWorkspace({
                 <button
                   type="button"
                   onClick={handleMicButtonClick}
-                  disabled={disabled || isRequestingPermission}
+                  disabled={isProcessing}
                   className={cn(
                     "h-16 w-16 rounded-full flex items-center justify-center text-white shadow-md transition-all duration-200 cursor-pointer",
-                    disabled
-                      ? "bg-slate-300 cursor-not-allowed"
+                    isRecording
+                      ? "bg-rose-600 hover:bg-rose-700 shadow-rose-500/20"
+                      : micPermission === "denied"
+                      ? "bg-amber-600 hover:bg-amber-700 hover:scale-105 active:scale-95 shadow-amber-500/20"
                       : "bg-[#2563EB] hover:bg-blue-700 hover:scale-105 active:scale-95 shadow-blue-500/20"
                   )}
-                  title="Click to start dictating"
+                  title={
+                    micPermission !== "granted"
+                      ? "Click to grant microphone permission"
+                      : !hasPatient
+                      ? "Click to test microphone or select a patient to dictate"
+                      : "Click to start recording dictation"
+                  }
                 >
                   {isRequestingPermission ? (
                     <Loader2 className="h-7 w-7 animate-spin" />
@@ -390,7 +560,10 @@ export function DictationWorkspace({
                 </button>
 
                 {micPermission === "denied" && (
-                  <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-amber-500 text-white flex items-center justify-center text-[10px] shadow-sm" title="Microphone permission required">
+                  <span
+                    className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-amber-500 text-white flex items-center justify-center text-[10px] shadow-sm"
+                    title="Microphone permission required"
+                  >
                     <Lock className="h-3 w-3" />
                   </span>
                 )}
@@ -398,10 +571,16 @@ export function DictationWorkspace({
 
               <span className="text-xs font-semibold text-slate-700">
                 {isRequestingPermission
-                  ? "Requesting microphone permission..."
+                  ? "Requesting microphone permission in browser..."
                   : micPermission === "denied"
-                  ? "Microphone access blocked — Click to allow in browser"
-                  : "Click microphone to start recording doctor dictation"}
+                  ? "Microphone access blocked — Click to unblock in browser"
+                  : micPermission !== "granted"
+                  ? "Click microphone to enable browser audio access"
+                  : isRecording
+                  ? "Recording clinical voice dictation..."
+                  : hasPatient
+                  ? `Click microphone to start dictating for ${patientName}`
+                  : "Click microphone to test audio (Select patient on left to dictate)"}
               </span>
               <span className="text-[10px] text-slate-400 max-w-xs">
                 Speaks Hindi, English & medical shorthand (OD, BD, TDS, SOS)
@@ -417,9 +596,9 @@ export function DictationWorkspace({
           )}
 
           {/* =========================================================================
-              PRODUCTION PERMISSION RECOVERY & GUIDANCE CARD
+              4. PRODUCTION PERMISSION RECOVERY & GUIDANCE CARD (When browser policy denies)
              ========================================================================= */}
-          {showPermissionHelp && !isRecording && !isProcessing && (
+          {showPermissionHelp && micPermission === "denied" && !isRecording && !isProcessing && (
             <div className="w-full max-w-md mt-4 p-4 rounded-xl bg-amber-50/90 border border-amber-200 text-slate-800 text-xs shadow-2xs">
               <div className="flex items-start gap-3">
                 <div className="h-8 w-8 rounded-lg bg-amber-100 border border-amber-300 text-amber-800 flex items-center justify-center shrink-0">
@@ -459,7 +638,7 @@ export function DictationWorkspace({
                     <Button
                       type="button"
                       size="sm"
-                      onClick={startRecording}
+                      onClick={requestMicPermission}
                       className="h-7 text-xs bg-amber-600 hover:bg-amber-700 text-white font-semibold gap-1.5 shadow-2xs cursor-pointer"
                     >
                       <RefreshCw className="h-3 w-3" />
@@ -515,13 +694,19 @@ export function DictationWorkspace({
               placeholder="Paste or type consultation notes here (e.g. Patient Rajesh, 42M, complaints of fever 3 days. Rx: Tab Dolo 650 TDS, Pantocid 40 OD...)"
               rows={4}
               className="w-full text-xs p-3 rounded-lg border border-slate-200 bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#2563EB] font-sans"
-              disabled={isProcessing || disabled}
+              disabled={isProcessing}
             />
-            <div className="flex justify-end">
+            <div className="flex items-center justify-between">
+              {!hasPatient ? (
+                <span className="text-[11px] text-amber-600 font-medium flex items-center gap-1">
+                  <AlertCircle className="h-3 w-3" />
+                  Select a patient on the left before extracting
+                </span>
+              ) : <span />}
               <Button
                 type="submit"
                 size="sm"
-                disabled={!textInput.trim() || isProcessing || disabled}
+                disabled={!textInput.trim() || isProcessing}
                 className="h-8 text-xs bg-[#2563EB] hover:bg-blue-700 text-white gap-1.5 cursor-pointer"
               >
                 {isProcessing ? (

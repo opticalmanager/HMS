@@ -379,7 +379,9 @@ export function CopilotWorkspace() {
               onDictateText={handleDictateText}
               isProcessing={isDictating}
               statusMessage={dictationStatus}
-              disabled={!selectedPatient}
+              hasPatient={!!selectedPatient}
+              patientName={selectedPatient?.fullName}
+              disabled={false}
             />
 
             {hasDrafts && (

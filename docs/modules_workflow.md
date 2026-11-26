@@ -157,6 +157,9 @@ The **Doctor AI Copilot** is a high-density, multi-tenant clinical workspace des
      - Native tactile Mic button powered by the browser `MediaRecorder` API.
      - **Proactive Microphone Permission Lifecycle & Reactive Unlock Listener**:
        - Proactively queries `navigator.permissions.query({ name: 'microphone' })` on mount with live `permissionStatus.onchange` listener.
+       - Features a high-visibility **Enable Microphone** prompt banner on first visit that directly invokes `getUserMedia()` upon user gesture to trigger the native browser permission dialog.
+       - Decouples microphone hardware access from patient selection: the mic button is never hard-disabled or greyed out, allowing audio testing and permission granting before a patient is selected.
+       - If attempted without an active patient, guides the clinician to select or register a walk-in patient from the left rail.
        - If blocked/denied by browser policy (where browsers suppress native dialogs), displays a high-density, dismissible **Microphone Permission Required** card with 3-step address-bar unlock instructions.
        - Includes quick-action **Re-check & Test Microphone** and 1-click **Use Text Note Fallback** to keep doctors unblocked.
      - Real-time animated audio visualizer canvas driven by `AudioContext` and `AnalyserNode`.
