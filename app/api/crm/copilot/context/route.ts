@@ -46,13 +46,15 @@ export async function GET(request: NextRequest) {
 
     const linkedDoctorId = linkedDoc?.id || null;
 
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
     // Doctor filter logic:
     // - If requestedDoctorId === "all", show all doctors' queues (no filter)
     // - If requestedDoctorId is a specific doctor UUID, filter by it
     // - If not provided and user is a doctor with a linked doctor row, default to their own queue
     // - If not provided and user is owner/admin/staff, show all appointments so nothing is hidden
     let effectiveDoctorFilter: string | undefined = undefined;
-    if (requestedDoctorId && requestedDoctorId !== "all") {
+    if (requestedDoctorId && requestedDoctorId !== "all" && UUID_REGEX.test(requestedDoctorId)) {
       effectiveDoctorFilter = requestedDoctorId;
     } else if (!requestedDoctorId && role === "doctor" && linkedDoctorId) {
       effectiveDoctorFilter = linkedDoctorId;
@@ -108,7 +110,7 @@ export async function GET(request: NextRequest) {
 
     // 5. Selected Patient (if provided or deduced from appointment)
     let targetPatientId = patientId;
-    if (!targetPatientId && appointmentId) {
+    if (!targetPatientId && appointmentId && UUID_REGEX.test(appointmentId)) {
       const [appt] = await db
         .select({ patientId: appointments.patientId })
         .from(appointments)
@@ -119,12 +121,27 @@ export async function GET(request: NextRequest) {
 
     let selectedPatient = null;
     if (targetPatientId) {
-      const [p] = await db
-        .select()
-        .from(patients)
-        .where(and(eq(patients.organizationId, clinicId), eq(patients.id, targetPatientId)))
-        .limit(1);
-      selectedPatient = p || null;
+      if (UUID_REGEX.test(targetPatientId)) {
+        const [p] = await db
+          .select()
+          .from(patients)
+          .where(and(eq(patients.organizationId, clinicId), eq(patients.id, targetPatientId)))
+          .limit(1);
+        selectedPatient = p || null;
+      } else {
+        // Resilient fallback: lookup by UHID or phone if non-UUID is passed
+        const [p] = await db
+          .select()
+          .from(patients)
+          .where(
+            and(
+              eq(patients.organizationId, clinicId),
+              sql`(${patients.uhid} = ${targetPatientId} OR ${patients.phone} = ${targetPatientId})`
+            )
+          )
+          .limit(1);
+        selectedPatient = p || null;
+      }
     } else if (todayQueue.length > 0 && todayQueue[0].patientId) {
       // Default to first patient in queue if none explicitly selected
       const [p] = await db

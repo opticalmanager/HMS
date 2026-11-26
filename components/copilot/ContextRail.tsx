@@ -142,7 +142,8 @@ export function ContextRail({
               <>
                 <option value="all">All Doctors (Full Clinic Queue)</option>
                 {doctors.map((doc) => {
-                  const docLabel = doc.fullName.startsWith("Dr.") ? doc.fullName : `Dr. ${doc.fullName}`;
+                  const cleanDocName = doc.fullName.replace(/^(Dr\.?\s*)+/i, "");
+                  const docLabel = `Dr. ${cleanDocName}`;
                   return (
                     <option key={doc.id} value={doc.id}>
                       {docLabel} ({doc.specialty || "General"})

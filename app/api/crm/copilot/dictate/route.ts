@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
 
         const buffer = Buffer.from(await audioFile.arrayBuffer());
         audioBase64 = buffer.toString("base64");
-        mimeType = audioFile.type || "audio/webm";
+        mimeType = (audioFile.type || "audio/webm").split(";")[0].trim();
       }
     } else {
       let body: unknown;

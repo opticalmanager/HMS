@@ -349,7 +349,9 @@ export function CopilotWorkspace() {
           <div className="hidden sm:flex items-center gap-2 text-[11px] text-slate-600 bg-slate-50 border border-slate-200/80 px-2.5 py-1 rounded-md">
             <span>Doctor Desk:</span>
             <strong className="text-slate-800 font-semibold">
-              Dr. {activeDoctorObj?.fullName || "Physician"}
+              {activeDoctorObj?.fullName
+                ? `Dr. ${activeDoctorObj.fullName.replace(/^(Dr\.?\s*)+/i, "")}`
+                : "Dr. Physician"}
             </strong>
           </div>
         </div>
