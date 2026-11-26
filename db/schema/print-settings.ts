@@ -1,11 +1,17 @@
 import { pgTable, text, timestamp, boolean, uuid, integer, jsonb, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { organizations } from "./organizations";
 
-export {
+import {
   PRINT_TEMPLATE_TYPES,
   type PrintTemplateType,
   type PrintSettingsConfig,
 } from "@/lib/print-defaults";
+
+export {
+  PRINT_TEMPLATE_TYPES,
+  type PrintTemplateType,
+  type PrintSettingsConfig,
+};
 
 export const printSettings = pgTable(
   "print_settings",
