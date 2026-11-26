@@ -62,6 +62,8 @@ export function DictationWorkspace({
   const [audioVolume, setAudioVolume] = React.useState(0);
 
   const mediaRecorderRef = React.useRef<MediaRecorder | null>(null);
+  const streamRef = React.useRef<MediaStream | null>(null);
+  const audioSourceRef = React.useRef<MediaStreamAudioSourceNode | null>(null);
   const audioChunksRef = React.useRef<Blob[]>([]);
   const timerRef = React.useRef<NodeJS.Timeout | null>(null);
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
@@ -74,16 +76,70 @@ export function DictationWorkspace({
   // 3-minute hard ceiling (180s)
   const MAX_RECORDING_SECS = 180;
 
-  // Cleanup audio context and tracks on unmount
+  // Dedicated, industrial-grade hardware teardown ensuring microphone is released immediately
+  const stopHardwareStream = React.useCallback(() => {
+    isRecordingRef.current = false;
+
+    // 1. Immediately terminate and disable every hardware audio track
+    if (streamRef.current) {
+      try {
+        const tracks = streamRef.current.getTracks();
+        tracks.forEach((track) => {
+          track.stop();
+          track.enabled = false;
+        });
+      } catch (err) {
+        console.error("Failed to stop media track:", err);
+      }
+      streamRef.current = null;
+    }
+
+    // 2. Disconnect Web Audio graph to break browser hardware consumer bindings
+    if (audioSourceRef.current) {
+      try {
+        audioSourceRef.current.disconnect();
+      } catch (err) {}
+      audioSourceRef.current = null;
+    }
+
+    if (analyserRef.current) {
+      try {
+        analyserRef.current.disconnect();
+      } catch (err) {}
+      analyserRef.current = null;
+    }
+
+    if (audioContextRef.current && audioContextRef.current.state !== "closed") {
+      try {
+        audioContextRef.current.close().catch(() => {});
+      } catch (err) {}
+      audioContextRef.current = null;
+    }
+
+    // 3. Stop animations & countdown timers
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    setAudioVolume(0);
+  }, []);
+
+  // Cleanup all audio hardware on unmount or patient switch
   React.useEffect(() => {
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
-      if (audioContextRef.current && audioContextRef.current.state !== "closed") {
-        audioContextRef.current.close().catch(() => {});
+      stopHardwareStream();
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+        try {
+          mediaRecorderRef.current.onstop = null;
+          mediaRecorderRef.current.stop();
+        } catch (e) {}
       }
     };
-  }, []);
+  }, [stopHardwareStream, patientName]);
 
   // Check initial browser microphone permission state & listen for changes
   React.useEffect(() => {
@@ -229,7 +285,7 @@ export function DictationWorkspace({
     render();
   };
 
-  // Direct user-gesture triggered permission request
+  // Direct user-gesture triggered permission request (used for recovery when permission was denied)
   const requestMicPermission = async () => {
     setIsRequestingPermission(true);
     setMicError(null);
@@ -247,12 +303,15 @@ export function DictationWorkspace({
       }
 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      // User clicked "Allow" in browser native popup!
-      stream.getTracks().forEach((track) => track.stop()); // close test hardware stream
+      // Immediately terminate test hardware tracks so the mic is not held active in browser
+      stream.getTracks().forEach((track) => {
+        track.stop();
+        track.enabled = false;
+      });
       setMicPermission("granted");
       setShowPermissionHelp(false);
       setShowPermissionSuccess(true);
-      setTimeout(() => setShowPermissionSuccess(false), 4500);
+      setTimeout(() => setShowPermissionSuccess(false), 3000);
       setNoPatientWarning(false);
     } catch (err: any) {
       const errName = err?.name || "";
@@ -281,6 +340,9 @@ export function DictationWorkspace({
     audioChunksRef.current = [];
     setIsRequestingPermission(true);
 
+    // Safety: ensure any previous lingering audio streams are completely closed
+    stopHardwareStream();
+
     try {
       if (
         typeof window !== "undefined" &&
@@ -294,8 +356,9 @@ export function DictationWorkspace({
       }
 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
 
-      // Permission successfully granted!
+      // Permission successfully confirmed
       setMicPermission("granted");
       setShowPermissionHelp(false);
       setMicError(null);
@@ -305,6 +368,7 @@ export function DictationWorkspace({
       const audioCtx = new AudioCtx();
       audioContextRef.current = audioCtx;
       const source = audioCtx.createMediaStreamSource(stream);
+      audioSourceRef.current = source;
       const analyser = audioCtx.createAnalyser();
       analyser.fftSize = 128;
       analyser.smoothingTimeConstant = 0.75;
@@ -328,11 +392,8 @@ export function DictationWorkspace({
       };
 
       recorder.onstop = async () => {
-        isRecordingRef.current = false;
-        // Stop audio tracks
-        stream.getTracks().forEach((track) => track.stop());
-        if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
-        if (timerRef.current) clearInterval(timerRef.current);
+        // Immediately cut hardware stream so browser mic indicator turns off
+        stopHardwareStream();
 
         const fullBlob = new Blob(audioChunksRef.current, { type: mimeType });
         if (fullBlob.size > 0) {
@@ -358,7 +419,7 @@ export function DictationWorkspace({
         });
       }, 1000);
     } catch (err: any) {
-      isRecordingRef.current = false;
+      stopHardwareStream();
       setIsRecording(false);
       const errName = err?.name || "";
       const errMsg = err?.message || "";
@@ -386,36 +447,29 @@ export function DictationWorkspace({
   const stopRecording = () => {
     isRecordingRef.current = false;
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-      mediaRecorderRef.current.stop();
+      try {
+        mediaRecorderRef.current.stop();
+      } catch (err) {}
     }
+    // Cut hardware audio tracks immediately
+    stopHardwareStream();
     setIsRecording(false);
-    setAudioVolume(0);
-    if (timerRef.current) clearInterval(timerRef.current);
   };
 
   const discardRecording = () => {
     isRecordingRef.current = false;
-    if (timerRef.current) clearInterval(timerRef.current);
-    if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
-
     if (mediaRecorderRef.current) {
       try {
-        // Detach onstop callback so it does not send audio to the AI API
         mediaRecorderRef.current.onstop = null;
         if (mediaRecorderRef.current.state !== "inactive") {
           mediaRecorderRef.current.stop();
         }
       } catch (err) {}
     }
-
-    if (audioContextRef.current && audioContextRef.current.state !== "closed") {
-      audioContextRef.current.close().catch(() => {});
-    }
-
+    stopHardwareStream();
     audioChunksRef.current = [];
     setIsRecording(false);
     setRecordingSeconds(0);
-    setAudioVolume(0);
   };
 
   const handleMicButtonClick = () => {
@@ -424,22 +478,12 @@ export function DictationWorkspace({
       return;
     }
 
-    // 1. If mic permission has not yet been granted, request it directly via user gesture.
-    // This triggers the native browser "Allow / Block" popup immediately.
-    if (micPermission !== "granted") {
-      requestMicPermission();
-      return;
-    }
-
-    // 2. If mic is permitted, but no patient is selected, prompt clearly
+    // Require patient selection before recording
     if (!hasPatient) {
       setNoPatientWarning(true);
-      setShowPermissionSuccess(true);
-      setTimeout(() => setShowPermissionSuccess(false), 4500);
       return;
     }
 
-    // 3. Permitted and patient selected -> start recording
     setNoPatientWarning(false);
     startRecording();
   };
@@ -518,42 +562,7 @@ export function DictationWorkspace({
         </div>
 
         {/* =========================================================================
-            1. PROACTIVE PERMISSION BANNER (Shown when browser has not yet been granted permission)
-           ========================================================================= */}
-        {micPermission !== "granted" && micPermission !== "denied" && (
-          <div className="mb-3.5 p-3 rounded-xl bg-blue-50/90 border border-blue-200 text-slate-800 text-xs flex flex-wrap items-center justify-between gap-2 shadow-2xs">
-            <div className="flex items-center gap-2.5">
-              <div className="h-7 w-7 rounded-lg bg-[#2563EB] text-white flex items-center justify-center shrink-0">
-                <Mic className="h-3.5 w-3.5" />
-              </div>
-              <div>
-                <span className="font-bold text-blue-950 block text-xs">
-                  Microphone Permission Required
-                </span>
-                <span className="text-[11px] text-blue-800">
-                  Click &quot;Enable Microphone&quot; to prompt your browser to allow clinical voice recording.
-                </span>
-              </div>
-            </div>
-            <Button
-              type="button"
-              size="sm"
-              onClick={requestMicPermission}
-              disabled={isRequestingPermission}
-              className="h-7 px-3 text-xs bg-[#2563EB] hover:bg-blue-700 text-white font-medium gap-1.5 cursor-pointer shadow-2xs"
-            >
-              {isRequestingPermission ? (
-                <Loader2 className="h-3 w-3 animate-spin" />
-              ) : (
-                <Mic className="h-3 w-3" />
-              )}
-              Enable Microphone
-            </Button>
-          </div>
-        )}
-
-        {/* =========================================================================
-            2. PERMISSION GRANTED CONFIRMATION (Temporary reassurance)
+            1. PERMISSION GRANTED CONFIRMATION (Temporary reassurance)
            ========================================================================= */}
         {showPermissionSuccess && (
           <div className="mb-3.5 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs flex items-center justify-between gap-2 shadow-2xs">
